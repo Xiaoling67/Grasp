@@ -1,6 +1,6 @@
 # Grasp
 
-AI lecture companion for macOS — real-time transcription, notes, and search during class.
+A desktop AI lecture assistant for students that performs real-time transcription, translation, note generation, and search during class.
 
 ## Features
 
