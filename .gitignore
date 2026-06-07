@@ -1,0 +1,28 @@
+# Xcode
+*.xcuserdatad
+*.xcworkspace/xcuserdata
+DerivedData/
+Build/
+*.xcresult
+*.pm
+*.mode1v3
+*.mode2v3
+*.pbxuser
+!default.pbxuser
+!default.mode1v3
+!default.mode2v3
+!default.perspectivev3
+
+# Secrets
+Grasp/Services/Secrets.swift
+
+# macOS
+.DS_Store
+.AppleDouble
+
+# CocoaPods
+Pods/
+
+# Old project
+grasp-old/
+grasp-electron/
