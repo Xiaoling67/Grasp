@@ -75,8 +75,8 @@ struct BlockView: View {
     @EnvironmentObject var vm: AppViewModel; let block: LiveBlock; let isActive: Bool
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
-            if isActive, !vm.interimText.isEmpty {
-                (Text(block.textEn + " ").foregroundColor(Color(hex: "0A0A0A")) + Text(vm.interimText).foregroundColor(Color(hex: "5A5A5A"))).font(.inter(size: 13)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+            if isActive {
+                Text(block.textEn).font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A")).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(block.textEn).font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A")).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             }

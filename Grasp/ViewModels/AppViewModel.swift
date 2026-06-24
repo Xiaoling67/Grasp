@@ -291,8 +291,6 @@ import Foundation; import SwiftUI
                                       intuition: "You previously looked this up. Here's a quick refresher if needed.")
             autoExplainResult = r; autoExplainStreaming = false
             autoExplainNew = (bottomTab != "auto")
-            db.saveSearch(id: rid, lectureId: lectureId, query: detected.term, resultPro: r.professional, resultSimple: r.intuition)
-            sessionSearches.insert(r, at: 0)
             MemoryService.shared.recordInteraction(concept: detected.term, action: .autoExplain)
             return
         case .preventive, .neverSeen, .dismissed:
@@ -315,8 +313,6 @@ import Foundation; import SwiftUI
             let r = SearchResultState(id: rid, query: detected.term, professional: pro, intuition: intu)
             autoExplainResult = r; autoExplainStreaming = false
             autoExplainNew = (bottomTab != "auto")
-            db.saveSearch(id: rid, lectureId: lectureId, query: detected.term, resultPro: pro, resultSimple: intu)
-            sessionSearches.insert(r, at: 0)
             MemoryService.shared.recordInteraction(concept: detected.term, action: .autoExplain)
         } catch { autoExplainStreaming = false }
     }
