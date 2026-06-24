@@ -3,6 +3,7 @@ import SwiftUI
 // Spec 12: Settings — Default Mode + Display
 struct SettingsView: View {
     @EnvironmentObject var vm: AppViewModel; @State private var mode = "standard"; @State private var tl = "zh-CN"; @State private var fs = "medium"; @State private var st = true; @State private var hf = true
+    @State private var showKnowledgeProfile = false; @State private var knownCount = 0
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 24) {
@@ -18,9 +19,18 @@ struct SettingsView: View {
                 Toggle("Show translation", isOn: $st).font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A"))
                 Toggle("Hover to freeze scroll", isOn: $hf).font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A"))
             }
+            // Knowledge Profile
+            Button(action: { showKnowledgeProfile = true }) {
+                HStack {
+                    Text("Knowledge Profile").font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A"))
+                    Spacer()
+                    Text("\(knownCount) known").font(.inter(size: 11)).foregroundColor(Color(hex: "C0C0C0"))
+                }
+            }.buttonStyle(.plain)
             Spacer()
         }.padding(32).frame(maxWidth: 480) }
         .background(Color.white)
-        .onAppear { mode = DatabaseService.shared.getSetting(key: "defaultMode") ?? "standard"; tl = DatabaseService.shared.getSetting(key: "targetLanguage") ?? "zh-CN" }
+        .sheet(isPresented: $showKnowledgeProfile) { KnowledgeProfileView() }
+        .onAppear { mode = DatabaseService.shared.getSetting(key: "defaultMode") ?? "standard"; tl = DatabaseService.shared.getSetting(key: "targetLanguage") ?? "zh-CN"; knownCount = MemoryService.shared.getKnownTerms().count }
     }
 }

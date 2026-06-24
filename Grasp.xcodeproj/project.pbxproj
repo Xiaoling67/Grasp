@@ -34,10 +34,13 @@
 		CA61D6C9CB848574D42D44B0 /* TranscriptPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08D4ECD99229FFB3103D0C34 /* TranscriptPanelView.swift */; };
 		D3F9BB5BC78C359E914378FF /* SearchHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2814E5CAA92DA330A56E631B /* SearchHistoryView.swift */; };
 		D7343C150CF17087B964DE1D /* BottomPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD16972AB6BCD1EB8BBC7015 /* BottomPanelView.swift */; };
+		DAA59D28BD3F5D0949E86AD9 /* AutoExplainCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF3B3BD64A8943A7BFF95022 /* AutoExplainCardView.swift */; };
 		DFDD4739C6211E0F081FB365 /* PastLectureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76FD7FC2DB139B12AC601039 /* PastLectureView.swift */; };
 		E2B49B99116F27F9CA98F141 /* ToastView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46D20ABD3D4689B24D036B8B /* ToastView.swift */; };
 		EB02601CF8A3E7DFC24EC607 /* QwenTranslationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB6737F9316E1CCECB8BDDDE /* QwenTranslationService.swift */; };
 		F1657163AF0BE5F5CCF721AA /* NewLectureModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF54B238912C6C2902BD42D /* NewLectureModalView.swift */; };
+		AABBCCDD00112233AABBCCDD /* MemoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDEEFF0011223344AABBCCDD /* MemoryService.swift */; };
+		EEFF0011AABB2233CCDD4455 /* KnowledgeProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55667788AABBCCDD00112233 /* KnowledgeProfileView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -65,6 +68,7 @@
 		9AF54B238912C6C2902BD42D /* NewLectureModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewLectureModalView.swift; sourceTree = "<group>"; };
 		A4DEFEF46804B6FDF6E1415A /* GraspApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraspApp.swift; sourceTree = "<group>"; };
 		BD68926637E5E8CA66219D7E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		BF3B3BD64A8943A7BFF95022 /* AutoExplainCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoExplainCardView.swift; sourceTree = "<group>"; };
 		D663CDDC59EB3533525F98A1 /* LiveTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveTabView.swift; sourceTree = "<group>"; };
 		DBF04FE70C69BB819F716A6F /* SaveCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveCardView.swift; sourceTree = "<group>"; };
 		DD16972AB6BCD1EB8BBC7015 /* BottomPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomPanelView.swift; sourceTree = "<group>"; };
@@ -75,6 +79,8 @@
 		EA2717BF631ABA7130EE4897 /* InterFont.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterFont.swift; sourceTree = "<group>"; };
 		EB6737F9316E1CCECB8BDDDE /* QwenTranslationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenTranslationService.swift; sourceTree = "<group>"; };
 		FCEEFA44DA1BD75E7B0056BC /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
+		DDEEFF0011223344AABBCCDD /* MemoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryService.swift; sourceTree = "<group>"; };
+		55667788AABBCCDD00112233 /* KnowledgeProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KnowledgeProfileView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -132,6 +138,7 @@
 				E8D42C0386BFC6B3C449BE0E /* SavedItemsView.swift */,
 				2814E5CAA92DA330A56E631B /* SearchHistoryView.swift */,
 				77D025A429999DB939694919 /* SettingsView.swift */,
+				55667788AABBCCDD00112233 /* KnowledgeProfileView.swift */,
 			);
 			path = Pages;
 			sourceTree = "<group>";
@@ -196,6 +203,7 @@
 		B251E095E71BB36F77F8D6B7 /* Bottom */ = {
 			isa = PBXGroup;
 			children = (
+				BF3B3BD64A8943A7BFF95022 /* AutoExplainCardView.swift */,
 				DD16972AB6BCD1EB8BBC7015 /* BottomPanelView.swift */,
 				DBF04FE70C69BB819F716A6F /* SaveCardView.swift */,
 				97C410AB07F2D52E455333A8 /* SearchCardView.swift */,
@@ -220,6 +228,7 @@
 				5FBB86C6CC26191B835E3520 /* DeepSeekService.swift */,
 				EB6737F9316E1CCECB8BDDDE /* QwenTranslationService.swift */,
 				FCEEFA44DA1BD75E7B0056BC /* Secrets.swift */,
+				DDEEFF0011223344AABBCCDD /* MemoryService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -248,6 +257,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = C7BF4F9505341F1135A14403 /* Build configuration list for PBXNativeTarget "Grasp" */;
 			buildPhases = (
+				8DE1AB47F5E9775132919C9D /* Copy Inter Font */,
 				B52C224AB6F8693BB6D03AD5 /* Sources */,
 				6FFF311AC3C01592044424E9 /* Frameworks */,
 			);
@@ -292,6 +302,27 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		8DE1AB47F5E9775132919C9D /* Copy Inter Font */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy Inter Font";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "mkdir -p \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\ncp \"${SRCROOT}/Grasp/Resources/Inter.ttc\" \"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		B52C224AB6F8693BB6D03AD5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -299,6 +330,7 @@
 			files = (
 				BE641C8474B3A447616E8EDB /* AppViewModel.swift in Sources */,
 				5845F04708DE1630244380D3 /* AudioService.swift in Sources */,
+				DAA59D28BD3F5D0949E86AD9 /* AutoExplainCardView.swift in Sources */,
 				D7343C150CF17087B964DE1D /* BottomPanelView.swift in Sources */,
 				42F0E1FD870C79AF550340D3 /* ColdCallCardView.swift in Sources */,
 				93BC6F1BA576EC5A55863AD1 /* Color+Hex.swift in Sources */,
@@ -327,7 +359,9 @@
 				E2B49B99116F27F9CA98F141 /* ToastView.swift in Sources */,
 				8B4066C16713859A2A1F00E7 /* TopBarView.swift in Sources */,
 				CA61D6C9CB848574D42D44B0 /* TranscriptPanelView.swift in Sources */,
-			);
+				AABBCCDD00112233AABBCCDD /* MemoryService.swift in Sources */,
+				EEFF0011AABB2233CCDD4455 /* KnowledgeProfileView.swift in Sources */,
+				);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

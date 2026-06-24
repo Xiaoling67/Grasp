@@ -19,7 +19,11 @@ final class DatabaseService {
             CREATE TABLE IF NOT EXISTS searches(id TEXT PRIMARY KEY, lecture_id TEXT, block_id TEXT, query TEXT, result_pro TEXT, result_simple TEXT, note TEXT, saved INTEGER DEFAULT 0, created_at INTEGER);
             CREATE TABLE IF NOT EXISTS lecture_slides(lecture_id TEXT PRIMARY KEY, structure TEXT, created_at INTEGER);
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
+            CREATE TABLE IF NOT EXISTS student_knowledge(concept TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'never_seen', search_count INTEGER DEFAULT 0, first_seen_at INTEGER, last_interacted_at INTEGER, source TEXT DEFAULT 'auto');
         """)
+        // PRD Section 9: implicit feedback columns (safe to run on existing DBs)
+        exec("ALTER TABLE searches ADD COLUMN engaged INTEGER DEFAULT 0")
+        exec("ALTER TABLE searches ADD COLUMN dismissed_at INTEGER")
     }
 
     deinit { if let db { sqlite3_close(db) } }
@@ -149,6 +153,8 @@ final class DatabaseService {
     }
     func saveSearchNote(id: String, note: String) { run("UPDATE searches SET note=? WHERE id=?", [note, id]) }
     func markSearchSaved(id: String) { run("UPDATE searches SET saved=1 WHERE id=?", [id]) }
+    func markSearchEngaged(id: String) { run("UPDATE searches SET engaged=1 WHERE id=?", [id]) }
+    func markSearchDismissed(id: String) { run("UPDATE searches SET dismissed_at=? WHERE id=?", [now(), id]) }
     func getSearches(lectureId: String) -> [SearchResult] {
         query("SELECT * FROM searches WHERE lecture_id=? ORDER BY created_at ASC", [lectureId]).map(mapSearch)
     }
@@ -201,4 +207,23 @@ final class DatabaseService {
     // Settings
     func getSetting(key: String) -> String? { row("SELECT value FROM settings WHERE key=?", [key])?["value"] as? String }
     func setSetting(key: String, value: String) { run("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [key, value]) }
+
+    // MARK: - Student Knowledge Profile
+    func saveKnowledgeRecord(concept: String, status: String, searchCount: Int, firstSeenAt: Int64?, lastInteractedAt: Int64?, source: String) {
+        run("""
+            INSERT INTO student_knowledge(concept,status,search_count,first_seen_at,last_interacted_at,source)
+            VALUES(?,?,?,?,?,?)
+            ON CONFLICT(concept) DO UPDATE SET
+                status=COALESCE(NULLIF(excluded.status,''),student_knowledge.status),
+                search_count=excluded.search_count,
+                last_interacted_at=excluded.last_interacted_at,
+                first_seen_at=COALESCE(student_knowledge.first_seen_at,excluded.first_seen_at)
+            """, [concept, status, searchCount, firstSeenAt as Any?, lastInteractedAt as Any?, source])
+    }
+    func getKnowledgeRecord(concept: String) -> [String: Any]? { row("SELECT * FROM student_knowledge WHERE concept=?", [concept]) }
+    func getAllKnowledgeRecords() -> [[String: Any]] { query("SELECT * FROM student_knowledge ORDER BY last_interacted_at DESC") }
+    func deleteKnowledgeRecord(concept: String) { run("DELETE FROM student_knowledge WHERE concept=?", [concept]) }
+    func getKnownTerms() -> [String] { query("SELECT concept FROM student_knowledge WHERE status='known'").map { $0["concept"] as? String ?? "" }.filter { !$0.isEmpty } }
+    func updateKnowledgeStatus(concept: String, status: String) { run("UPDATE student_knowledge SET status=?,last_interacted_at=? WHERE concept=?", [status, now(), concept]) }
+    func clearAllKnowledgeRecords() { run("DELETE FROM student_knowledge") }
 }
