@@ -12,11 +12,15 @@ targets:
   Grasp:
     type: application
     platform: macOS
-    sources: [{ path: Grasp, excludes: ["Resources"] }]
-    resources: [{ path: Grasp/Resources, type: folder }]
+    sources: [{ path: Grasp, excludes: ["Resources/Inter.ttc", "Services/Secrets.example.swift"] }]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.grasp.app
         INFOPLIST_FILE: Grasp/Info.plist
         CODE_SIGN_ENTITLEMENTS: Grasp/Grasp.entitlements
     dependencies: [{ sdk: libsqlite3.tbd }]
+    preBuildScripts:
+      - name: Copy Inter Font
+        script: |
+          mkdir -p "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          cp "${SRCROOT}/Grasp/Resources/Inter.ttc" "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/"

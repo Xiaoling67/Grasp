@@ -26,6 +26,13 @@ import Foundation; import SwiftUI
     // Cold call (Spec 7.2: coldCallStore)
     @Published var coldCallPhase: ColdCallPhase? = nil
 
+    // Auto Explain
+    @Published var autoExplainResult: SearchResultState? = nil
+    @Published var autoExplainStreaming = false
+    @Published var autoExplainTokens = ""
+    @Published var autoExplainNew = false
+    private var recentlyExplained = Set<String>()
+
     // Modals & Toast
     @Published var showNewLectureModal = false; @Published var showExportModal = false
     @Published var showOnboarding = false; @Published var onboardingChecked = false
@@ -73,7 +80,10 @@ import Foundation; import SwiftUI
         dg.onInterim = { [weak self] in self?.handleInterim($0) }
         dg.onEnd = { [weak self] in self?.handleEnd() }
         dg.onStatus = { [weak self] in self?.deepgramStatus = $0 }
-        dg.connect(sr: au.sampleRate)
+        // PRD P1-4: generate domain keywords and inject into Deepgram for better terminology recognition
+        let subject = activeLectureSubject
+        let keywords = subject.isEmpty ? [] : await ds.generateKeywords(subject: subject)
+        dg.connect(sr: au.sampleRate, keywords: keywords)
     }
 
     func stopLecture() async {
@@ -90,6 +100,7 @@ import Foundation; import SwiftUI
 
     func handleInterim(_ t: String) {
         guard isRecording, !isPaused else { return }
+        interimText = t
         let pw = interimBuf.split(separator: " "), cw = t.split(separator: " ")
         if cw.count > pw.count {
             let nw = cw.dropFirst(pw.count).joined(separator: " ")
@@ -108,10 +119,16 @@ import Foundation; import SwiftUI
         if activeBlockId == nil { newBlock() }
         guard let i = liveBlocks.firstIndex(where: { $0.id == activeBlockId }) else { return }
         if !tw.isEmpty { liveBlocks[i].textEn += (liveBlocks[i].textEn.isEmpty ? "" : " ") + tw }
+        // PRD P0-2: force seal at 100-word upper limit
+        let wordCount = liveBlocks[i].textEn.split(separator: " ").count
+        if wordCount >= 100 { seal(liveBlocks[i].textEn) }
     }
 
     func handleEnd() {
         guard isRecording, !isPaused, let b = activeBlock, !b.textEn.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        // PRD P0-2: only seal if block has reached 50-word lower limit
+        let wordCount = b.textEn.split(separator: " ").count
+        guard wordCount >= 50 else { return }
         seal(b.textEn)
     }
 
@@ -124,6 +141,7 @@ import Foundation; import SwiftUI
         guard let lid = activeLectureId, let i = liveBlocks.firstIndex(where: { $0.id == activeBlockId }) else { return }
         liveBlocks[i].isSealed = true; liveBlocks[i].textEn = text
         let bi = liveBlocks[i].blockIndex; activeBlockId = nil
+        interimText = ""
         db.saveBlock(lectureId: lid, blockIndex: bi, textEn: text, textZh: nil)
 
         if activeLectureMode == "international" {
@@ -137,12 +155,16 @@ import Foundation; import SwiftUI
             guard !Task.isCancelled else { return }
             let rb = db.getRecentBlocks(lectureId: lid, beforeIndex: bi+1, limit: 3)
             let sl = db.getSlideStructure(lectureId: lid)
-            if let e = await ds.generateNoteEntry(slides: sl, recent: rb, subject: activeLectureSubject) {
+            let rn = Array(noteBlocks.suffix(3))
+            if let e = await ds.generateNoteEntry(slides: sl, recent: rb, recentNotes: rn, subject: activeLectureSubject) {
                 let t = sl.first(where: { $0.index == e.0 })?.title
                 let n = db.saveNoteBlock(lectureId: lid, slideIndex: e.0, slideTitle: t, content: e.1, source: "ai", level: e.2)
                 noteBlocks.append(n)
             }
         }
+        // Auto-explain: runs fully in parallel, does not affect NoteAgent
+        let capturedText = text; let capturedLid = lid
+        Task { await autoExplain(text: capturedText, lectureId: capturedLid) }
         detectCC(text)
     }
 
@@ -174,11 +196,54 @@ import Foundation; import SwiftUI
         coldCallPhase = .generating
         let ctx = db.getRecentBlocks(lectureId: lid, beforeIndex: 9999, limit: 15)
         let sl = db.getSlideStructure(lectureId: lid)
-        if let a = await ds.generateColdCallAnswer(question: q, context: ctx, slides: sl, subject: activeLectureSubject) {
+        let rn = Array(noteBlocks.suffix(10))
+        if let a = await ds.generateColdCallAnswer(question: q, context: ctx, slides: sl, recentNotes: rn, subject: activeLectureSubject) {
             coldCallPhase = .answered(a)
         } else { coldCallPhase = nil }
     }
     func dismissCC() { coldCallPhase = nil }
+
+    // MARK: - Auto Explain
+    private func autoExplain(text: String, lectureId: String) async {
+        guard let detected = await ds.detectUnfamiliarTerm(text: text, subject: activeLectureSubject, knownTerms: recentlyExplained) else { return }
+        guard detected.confidence > 0.65 else { return }
+        let key = detected.term.lowercased()
+        guard !recentlyExplained.contains(key) else { return }
+        recentlyExplained.insert(key)
+        if recentlyExplained.count > 60, let old = recentlyExplained.first { recentlyExplained.remove(old) }
+
+        let rid = UUID().uuidString
+        autoExplainStreaming = true; autoExplainTokens = ""
+        let ctx = db.getRecentBlocks(lectureId: lectureId, beforeIndex: 9999, limit: 10)
+        do {
+            let full = try await ds.streamSearch(query: detected.term, context: ctx, subject: activeLectureSubject) { [weak self] t in
+                self?.autoExplainTokens += t
+            }
+            let parts = full.components(separatedBy: " | ")
+            let pro = parts.first?.trimmingCharacters(in: .whitespaces) ?? full
+            let intu = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+            let r = SearchResultState(id: rid, query: detected.term, professional: pro, intuition: intu)
+            autoExplainResult = r; autoExplainStreaming = false
+            autoExplainNew = (bottomTab != "auto")
+            db.saveSearch(id: rid, lectureId: lectureId, query: detected.term, resultPro: pro, resultSimple: intu)
+            sessionSearches.insert(r, at: 0)
+        } catch { autoExplainStreaming = false }
+    }
+
+    func dismissAutoExplain() { autoExplainResult = nil; autoExplainNew = false; autoExplainTokens = "" }
+    func saveCCToNotes(answer: ColdCallAnswer) {
+        guard let lid = activeLectureId else { return }
+        let last = noteBlocks.last
+        let content = answer.shortAnswer
+        let n = db.saveNoteBlock(lectureId: lid, slideIndex: last?.slideIndex ?? 0, slideTitle: last?.slideTitle, content: content, source: "user", level: 1)
+        noteBlocks.append(n)
+        for point in answer.supportingPoints {
+            let p = db.saveNoteBlock(lectureId: lid, slideIndex: last?.slideIndex ?? 0, slideTitle: last?.slideTitle, content: point, source: "user", level: 2)
+            noteBlocks.append(p)
+        }
+        coldCallPhase = nil
+        showToast("Saved to notes.")
+    }
 
     // MARK: - Search (Spec 6.5)
     func triggerSearch(query: String, blockIndex: Int, lectureId: String? = nil) {
@@ -192,18 +257,24 @@ import Foundation; import SwiftUI
         let ctx = db.getRecentBlocks(lectureId: lid, beforeIndex: blockIndex, limit: 10)
         let subj = activeLectureSubject
         Task {
-            do {
-                let full = try await ds.streamSearch(query: query, context: ctx, subject: subj) { [weak self] t in self?.streamingTokens += t }
-                let parts = full.components(separatedBy: " | ")
-                let pro = parts.first?.trimmingCharacters(in: .whitespaces) ?? full
-                let intu = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
-                let r = SearchResultState(id: rid, query: query, professional: pro, intuition: intu)
-                sessionSearches.insert(r, at: 0); activeCard = .search(r); searchStreaming = false
-                searchCache[ck] = (pro, intu); db.saveSearch(id: rid, lectureId: lid, query: query, resultPro: pro, resultSimple: intu)
-            } catch {
-                var r = SearchResultState(id: rid, query: query); r.error = "Search failed. Check your connection."
-                sessionSearches.insert(r, at: 0); activeCard = .search(r); searchStreaming = false
+            var lastError: Error? = nil
+            for attempt in 1...2 {
+                do {
+                    if attempt == 2 { streamingTokens = "" }
+                    let full = try await ds.streamSearch(query: query, context: ctx, subject: subj) { [weak self] t in self?.streamingTokens += t }
+                    let parts = full.components(separatedBy: " | ")
+                    let pro = parts.first?.trimmingCharacters(in: .whitespaces) ?? full
+                    let intu = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+                    let r = SearchResultState(id: rid, query: query, professional: pro, intuition: intu)
+                    sessionSearches.insert(r, at: 0); activeCard = .search(r); searchStreaming = false
+                    searchCache[ck] = (pro, intu); db.saveSearch(id: rid, lectureId: lid, query: query, resultPro: pro, resultSimple: intu)
+                    return
+                } catch {
+                    lastError = error
+                }
             }
+            var r = SearchResultState(id: rid, query: query); r.error = "Search failed. Check your connection."
+            sessionSearches.insert(r, at: 0); activeCard = .search(r); searchStreaming = false
         }
         bottomTab = "current"
     }
@@ -211,12 +282,18 @@ import Foundation; import SwiftUI
     // MARK: - Save (Spec 10.3)
     func handleSaveAction(type: String, text: String) {
         guard let lid = activeLectureId else { return }
-        var trans: String? = nil
-        if activeLectureMode == "international" {
-            Task { trans = try? await tr.translate(text: text, subject: activeLectureSubject.isEmpty ? nil : activeLectureSubject) }
-        }
-        activeCard = .save(SaveDraft(type: type, original: text, translation: trans, lectureId: lid))
+        let draft = SaveDraft(type: type, original: text, translation: nil, lectureId: lid)
+        activeCard = .save(draft)
         bottomTab = "current"
+        if activeLectureMode == "international" {
+            Task {
+                let trans = try? await tr.translate(text: text, subject: activeLectureSubject.isEmpty ? nil : activeLectureSubject)
+                if let trans, !trans.isEmpty {
+                    let updated = SaveDraft(type: type, original: text, translation: trans, lectureId: lid)
+                    activeCard = .save(updated)
+                }
+            }
+        }
     }
     func confirmSave(draft: SaveDraft, note: String?) {
         guard let lid = draft.lectureId ?? activeLectureId else { return }
