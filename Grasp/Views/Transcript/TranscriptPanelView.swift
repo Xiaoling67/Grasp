@@ -4,8 +4,8 @@ import SwiftUI
 struct TranscriptPanelView: View {
     @EnvironmentObject var vm: AppViewModel
     @State private var popup: (String, Int, CGFloat, CGFloat)? = nil
-    @State private var mouseUpMonitor: Any? = nil
     @State private var panelFrame: CGRect = .zero
+    @State private var selectionObserver: Any? = nil
 
     var body: some View {
         GeometryReader { geo in
@@ -43,27 +43,46 @@ struct TranscriptPanelView: View {
             }.background(Color.white)
             .onAppear {
                 panelFrame = geo.frame(in: .global)
-                mouseUpMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseUp) { event in
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                        guard let window = NSApp.keyWindow,
-                              let tv = window.firstResponder as? NSTextView else { return }
-                        let range = tv.selectedRange()
-                        guard range.length > 2 else { popup = nil; return }
-                        let selected = (tv.string as NSString)
-                            .substring(with: range)
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !selected.isEmpty else { popup = nil; return }
-                        AppViewModel.lastSelectedText = selected
-                        let winH = window.contentView?.frame.height ?? window.frame.height
-                        let localX = event.locationInWindow.x - panelFrame.minX
-                        let localY = winH - event.locationInWindow.y - panelFrame.minY
-                        popup = (selected, 0, localX, localY)
+                // Observe text selection changes in the transcript.
+                // SwiftUI's .textSelection(.enabled) creates a temporary NSTextView field editor
+                // that posts didChangeSelectionNotification when the user selects text.
+                // This is more reliable than checking window.firstResponder.
+                selectionObserver = NotificationCenter.default.addObserver(
+                    forName: NSTextView.didChangeSelectionNotification,
+                    object: nil,
+                    queue: .main
+                ) { notification in
+                    guard let tv = notification.object as? NSTextView,
+                          let window = tv.window,
+                          window == NSApp.keyWindow,
+                          !tv.isEditable, tv.isSelectable else { return }
+
+                    let range = tv.selectedRange()
+                    guard range.length > 2 else { popup = nil; return }
+
+                    let selected = (tv.string as NSString)
+                        .substring(with: range)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !selected.isEmpty else { popup = nil; return }
+
+                    AppViewModel.lastSelectedText = selected
+
+                    // Position popup above the selected text
+                    if let lm = tv.layoutManager, let tc = tv.textContainer {
+                        let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+                        let rect = lm.boundingRect(forGlyphRange: glyphRange, in: tc)
+                        let windowRect = tv.convert(rect, to: nil)
+                        let popupX = windowRect.midX - panelFrame.minX
+                        let popupY = (tv.window?.contentView?.frame.height ?? 600) - windowRect.minY - panelFrame.minY
+                        popup = (selected, 0, popupX, popupY)
                     }
-                    return event
                 }
             }
             .onDisappear {
-                if let m = mouseUpMonitor { NSEvent.removeMonitor(m); mouseUpMonitor = nil }
+                if let obs = selectionObserver {
+                    NotificationCenter.default.removeObserver(obs)
+                    selectionObserver = nil
+                }
             }
             .onChange(of: geo.size) { _ in panelFrame = geo.frame(in: .global) }
         }
