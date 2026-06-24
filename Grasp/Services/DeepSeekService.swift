@@ -11,12 +11,14 @@ final class DeepSeekService {
         let ctx = context.map { $0.textEn }.joined(separator: "\n\n")
         let subjectLabel = subject.isEmpty ? "this subject" : subject
         let system = "You generate instant study cards for students in live university lectures. Be precise, grounded in the lecture, and speak directly to a confused student who just heard this term for the first time."
+        let knownTermsList = MemoryService.shared.getKnownTerms()
+        let knownTermsBlock = knownTermsList.isEmpty ? "" : "\nKnown terms (the student already understands these — don't waste time explaining them from scratch):\n\(knownTermsList.sorted().joined(separator: ", "))\n"
         let prompt = """
         Course: \(subject.isEmpty ? "Unknown" : subject)
 
         What the professor has been explaining:
         \(ctx.isEmpty ? "(lecture just started, no transcript yet)" : ctx)
-
+        \(knownTermsBlock)
         The student just highlighted: "\(query)"
 
         Write exactly 2 sentences separated by " | ". No markdown, no labels, no headers.

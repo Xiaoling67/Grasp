@@ -224,6 +224,28 @@ import Foundation; import SwiftUI
         guard detected.confidence > 0.65 else { return }
         let key = detected.term.lowercased()
         guard !recentlyExplained.contains(key) else { return }
+
+        // Check Knowledge Profile before showing explanation
+        let status = MemoryService.shared.checkConcept(detected.term)
+        switch status {
+        case .known:
+            return  // skip entirely, student knows this
+        case .lookedUp:
+            // Show a brief reminder — "You've seen this before" card
+            let rid = UUID().uuidString
+            let r = SearchResultState(id: rid, query: detected.term,
+                                      professional: "You've seen this before: \(detected.term)",
+                                      intuition: "You previously looked this up. Here's a quick refresher if needed.")
+            autoExplainResult = r; autoExplainStreaming = false
+            autoExplainNew = (bottomTab != "auto")
+            db.saveSearch(id: rid, lectureId: lectureId, query: detected.term, resultPro: r.professional, resultSimple: r.intuition)
+            sessionSearches.insert(r, at: 0)
+            MemoryService.shared.recordInteraction(concept: detected.term, action: .autoExplain)
+            return
+        case .preventive, .neverSeen, .dismissed:
+            break  // proceed to full explanation
+        }
+
         recentlyExplained.insert(key)
         if recentlyExplained.count > 60, let old = recentlyExplained.first { recentlyExplained.remove(old) }
 
@@ -242,10 +264,16 @@ import Foundation; import SwiftUI
             autoExplainNew = (bottomTab != "auto")
             db.saveSearch(id: rid, lectureId: lectureId, query: detected.term, resultPro: pro, resultSimple: intu)
             sessionSearches.insert(r, at: 0)
+            MemoryService.shared.recordInteraction(concept: detected.term, action: .autoExplain)
         } catch { autoExplainStreaming = false }
     }
 
-    func dismissAutoExplain() { autoExplainResult = nil; autoExplainNew = false; autoExplainTokens = "" }
+    func dismissAutoExplain() {
+        if let term = autoExplainResult?.query {
+            MemoryService.shared.recordInteraction(concept: term, action: .dismiss)
+        }
+        autoExplainResult = nil; autoExplainNew = false; autoExplainTokens = ""
+    }
     func saveCCToNotes(answer: ColdCallAnswer) {
         guard let lid = activeLectureId else { return }
         let last = noteBlocks.last
@@ -258,6 +286,11 @@ import Foundation; import SwiftUI
         }
         coldCallPhase = nil
         showToast("Saved to notes.")
+        // Extract key terms from cold call answer and add to Knowledge Profile
+        let terms = answer.shortAnswer.split(separator: " ").filter { $0.count > 3 }
+        for term in terms.prefix(3) {
+            MemoryService.shared.recordInteraction(concept: String(term).lowercased(), action: .autoExplain)
+        }
     }
 
     // MARK: - Search (Spec 6.5)
@@ -315,6 +348,11 @@ import Foundation; import SwiftUI
         let sid = db.createSave(lectureId: lid, blockId: nil, type: draft.type, original: draft.original, translation: draft.translation, note: note)
         let card = SavedCard(id: sid, lectureId: lid, type: draft.type, original: draft.original, translation: draft.translation, note: note)
         sessionSaves.insert(card, at: 0)
+        // Extract key terms from saved text and add to Knowledge Profile
+        let words = draft.original.split(separator: " ").filter { $0.count > 3 }
+        for word in words.prefix(5) {
+            MemoryService.shared.recordInteraction(concept: String(word), action: .save)
+        }
     }
 
     // MARK: - Notes (Spec 10.3: handleCopyToNotes)
