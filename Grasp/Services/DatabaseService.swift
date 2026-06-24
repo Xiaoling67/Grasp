@@ -20,6 +20,8 @@ final class DatabaseService {
             CREATE TABLE IF NOT EXISTS lecture_slides(lecture_id TEXT PRIMARY KEY, structure TEXT, created_at INTEGER);
             CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
             CREATE TABLE IF NOT EXISTS student_knowledge(concept TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'never_seen', search_count INTEGER DEFAULT 0, first_seen_at INTEGER, last_interacted_at INTEGER, source TEXT DEFAULT 'auto');
+            CREATE TABLE IF NOT EXISTS concept_map(id TEXT PRIMARY KEY, lecture_id TEXT NOT NULL, concept TEXT NOT NULL, parent_id TEXT, level INTEGER DEFAULT 0, content TEXT DEFAULT '', slide_index INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER, FOREIGN KEY (lecture_id) REFERENCES lectures(id));
+            CREATE INDEX IF NOT EXISTS idx_concept_map_lecture ON concept_map(lecture_id);
         """)
         // PRD Section 9: implicit feedback columns (safe to run on existing DBs)
         exec("ALTER TABLE searches ADD COLUMN engaged INTEGER DEFAULT 0")
@@ -125,6 +127,45 @@ final class DatabaseService {
                   textZh: $0["text_zh"] as? String, isFinal: ($0["is_final"] as? Int64).map(Int.init) ?? 1,
                   startedAt: $0["started_at"] as? Int64 ?? 0, createdAt: $0["created_at"] as? Int64)
         }.reversed()
+    }
+
+    // MARK: - Concept Map (v1.1)
+
+    func saveConceptMap(lectureId: String, nodes: [ConceptNode]) {
+        let nowMs = now()
+        run("DELETE FROM concept_map WHERE lecture_id=?", [lectureId])
+        for n in nodes {
+            run("INSERT INTO concept_map(id,lecture_id,concept,parent_id,level,content,slide_index,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                [n.id, lectureId, n.concept, n.parentId as Any?, n.level, n.content, n.slideIndex, n.createdAt, n.updatedAt])
+        }
+    }
+
+    func loadConceptMap(lectureId: String) -> [ConceptNode] {
+        query("SELECT * FROM concept_map WHERE lecture_id=? ORDER BY slide_index ASC, level ASC", [lectureId]).map {
+            ConceptNode(id: $0["id"] as? String ?? "",
+                        concept: $0["concept"] as? String ?? "",
+                        parentId: $0["parent_id"] as? String,
+                        level: ($0["level"] as? Int64).map(Int.init) ?? 0,
+                        content: $0["content"] as? String ?? "",
+                        slideIndex: ($0["slide_index"] as? Int64).map(Int.init) ?? 0,
+                        lectureId: $0["lecture_id"] as? String ?? "",
+                        createdAt: $0["created_at"] as? Int64 ?? 0,
+                        updatedAt: $0["updated_at"] as? Int64 ?? 0)
+        }
+    }
+
+    func deleteConceptMap(lectureId: String) {
+        run("DELETE FROM concept_map WHERE lecture_id=?", [lectureId])
+    }
+
+    func getRecentBlocks(lectureId: String, since: Date) -> [Block] {
+        let ms = Int64(since.timeIntervalSince1970 * 1000)
+        return query("SELECT * FROM blocks WHERE lecture_id=? AND created_at>? AND is_final=1 ORDER BY block_index ASC", [lectureId, ms]).map {
+            Block(id: $0["id"] as? String ?? "", lectureId: $0["lecture_id"] as? String ?? "",
+                  blockIndex: ($0["block_index"] as? Int64).map(Int.init) ?? 0, textEn: $0["text_en"] as? String ?? "",
+                  textZh: $0["text_zh"] as? String, isFinal: ($0["is_final"] as? Int64).map(Int.init) ?? 1,
+                  startedAt: $0["started_at"] as? Int64 ?? 0, createdAt: $0["created_at"] as? Int64)
+        }
     }
 
     // Saves

@@ -17,6 +17,7 @@ import Foundation; import SwiftUI
 
     // Notes (Spec 7.2: notesStore)
     @Published var noteBlocks = [NoteBlock](); @Published var slideStructure = [SlideItem]()
+    @Published var conceptMap = [ConceptNode]()
 
     // Bottom panel (Spec 7.2: lectureStore)
     @Published var activeCard: ActiveCardState? = nil; @Published var bottomTab = "current"
@@ -46,6 +47,8 @@ import Foundation; import SwiftUI
     private let tr = QwenTranslationService.shared
     private var interimBuf = ""; private var lastCC: Date?; private var noteTask: Task<Void,Never>?
     private var searchCache = [String:(String,String)]()
+    private var conceptMapTimer: Timer?
+    private var lastConceptMapFire: Date = .distantPast
 
     init() { loadPast(); checkOnboarding() }
 
@@ -82,6 +85,8 @@ import Foundation; import SwiftUI
             }
         }
 
+        startConceptMapTimer()
+
         let tab = TabItem(id: "live", type: .live, lectureId: lid, label: name ?? "Live Lecture")
         tabs = [tab] + tabs; activeTabId = "live"
         if !(await AudioService.requestPermission()) {
@@ -105,6 +110,9 @@ import Foundation; import SwiftUI
         isRecording = false; au.stopCapture(); dg.disconnect()
         if let b = activeBlock, !b.textEn.trimmingCharacters(in: .whitespaces).isEmpty { seal(b.textEn) }
         if let lid = activeLectureId { db.stopLecture(id: lid) }
+        await fireConceptMapUpdate()
+        conceptMapTimer?.invalidate()
+        conceptMapTimer = nil
         noteTask?.cancel(); searchCache.removeAll(); coldCallPhase = nil; loadPast()
     }
 
@@ -165,22 +173,67 @@ import Foundation; import SwiftUI
                 db.setBlockTranslation(lectureId: lid, blockIndex: bi, textZh: zh ?? "")
             }
         }
-        noteTask?.cancel()
-        noteTask = Task { try? await Task.sleep(nanoseconds: 500_000_000)
-            guard !Task.isCancelled else { return }
-            let rb = db.getRecentBlocks(lectureId: lid, beforeIndex: bi+1, limit: 3)
-            let sl = db.getSlideStructure(lectureId: lid)
-            let rn = Array(noteBlocks.suffix(3))
-            if let e = await ds.generateNoteEntry(slides: sl, recent: rb, recentNotes: rn, subject: activeLectureSubject) {
-                let t = sl.first(where: { $0.index == e.0 })?.title
-                let n = db.saveNoteBlock(lectureId: lid, slideIndex: e.0, slideTitle: t, content: e.1, source: "ai", level: e.2)
-                noteBlocks.append(n)
-            }
-        }
         // Auto-explain: runs fully in parallel, does not affect NoteAgent
         let capturedText = text; let capturedLid = lid
         Task { await autoExplain(text: capturedText, lectureId: capturedLid) }
         detectCC(text)
+    }
+
+    // MARK: - Concept Map (v1.1)
+
+    private func startConceptMapTimer() {
+        conceptMapTimer?.invalidate()
+        lastConceptMapFire = Date()
+        conceptMapTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
+            Task { [weak self] in await self?.fireConceptMapUpdate() }
+        }
+    }
+
+    @MainActor
+    private func fireConceptMapUpdate() async {
+        guard let lid = activeLectureId else { return }
+
+        // 1. Collect sealed blocks since last fire
+        let since = lastConceptMapFire
+        lastConceptMapFire = Date()
+
+        let windowBlocks = db.getRecentBlocks(lectureId: lid, since: since)
+
+        // 2. Skip if no new content
+        guard !windowBlocks.isEmpty else { return }
+
+        // 3. Get existing Concept Map
+        let existingMap = db.loadConceptMap(lectureId: lid)
+
+        // 4. Get slide structure
+        let slides = slideStructure
+
+        // 5. Build window text
+        let windowText = windowBlocks.map { $0.textEn }.joined(separator: "\n\n")
+
+        // 6. Call DeepSeek
+        guard let updatedNodes = await ds.generateConceptMapUpdate(
+            windowText: windowText,
+            existingMap: existingMap,
+            slides: slides,
+            subject: activeLectureSubject
+        ) else { return }
+
+        // 7. Preserve lectureId on all nodes
+        let nodesWithLectureId = updatedNodes.map { n -> ConceptNode in
+            var node = n
+            // Only set lectureId if it's missing
+            if node.lectureId.isEmpty {
+                node.lectureId = lid
+            }
+            return node
+        }
+
+        // 8. Save to DB
+        db.saveConceptMap(lectureId: lid, nodes: nodesWithLectureId)
+
+        // 9. Update in-memory state
+        conceptMap = nodesWithLectureId
     }
 
     // MARK: - Cold Call (Spec 6.10, 3.4)
@@ -371,6 +424,8 @@ import Foundation; import SwiftUI
         let t = TabItem(id: "past-\(id)", type: .past, lectureId: id, label: name ?? "Untitled")
         tabs.append(t); activeTabId = t.id
         slideStructure = db.getSlideStructure(lectureId: id)
+        conceptMap = db.loadConceptMap(lectureId: id)
+        noteBlocks = db.getNoteBlocks(lectureId: id)
     }
     func closeTab(id: String) { tabs.removeAll { $0.id == id }; if activeTabId == id { activeTabId = tabs.last?.id } }
 
@@ -380,7 +435,7 @@ import Foundation; import SwiftUI
 
     // MARK: - Reset
     private func resetLive() { liveBlocks = []; activeBlockId = nil; interimText = ""; interimBuf = ""
-        noteBlocks = []; slideStructure = []; activeCard = nil; bottomTab = "current"
+        noteBlocks = []; slideStructure = []; conceptMap = []; activeCard = nil; bottomTab = "current"
         sessionSaves = []; sessionSearches = []; coldCallPhase = nil; lastCC = nil; searchCache.removeAll() }
 
     /// Holds the most recent text selection from the transcript, for keyboard shortcuts.
