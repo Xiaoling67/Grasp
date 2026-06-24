@@ -51,30 +51,32 @@ struct TranscriptPanelView: View {
                     forName: NSTextView.didChangeSelectionNotification,
                     object: nil,
                     queue: .main
-                ) { notification in
-                    guard let tv = notification.object as? NSTextView,
-                          let window = tv.window,
-                          window == NSApp.keyWindow,
-                          !tv.isEditable, tv.isSelectable else { return }
+                ) { [self] notification in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                        guard let tv = notification.object as? NSTextView,
+                              let window = tv.window,
+                              window == NSApp.keyWindow,
+                              !tv.isEditable, tv.isSelectable else { return }
 
-                    let range = tv.selectedRange()
-                    guard range.length > 2 else { popup = nil; return }
+                        let range = tv.selectedRange()
+                        guard range.length > 2 else { popup = nil; return }
 
-                    let selected = (tv.string as NSString)
-                        .substring(with: range)
-                        .trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !selected.isEmpty else { popup = nil; return }
+                        let selected = (tv.string as NSString)
+                            .substring(with: range)
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !selected.isEmpty else { popup = nil; return }
 
-                    AppViewModel.lastSelectedText = selected
+                        AppViewModel.lastSelectedText = selected
 
-                    // Position popup above the selected text
-                    if let lm = tv.layoutManager, let tc = tv.textContainer {
-                        let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-                        let rect = lm.boundingRect(forGlyphRange: glyphRange, in: tc)
-                        let windowRect = tv.convert(rect, to: nil)
-                        let popupX = windowRect.midX - panelFrame.minX
-                        let popupY = (tv.window?.contentView?.frame.height ?? 600) - windowRect.minY - panelFrame.minY
-                        popup = (selected, 0, popupX, popupY)
+                        // Position popup above the selected text
+                        if let lm = tv.layoutManager, let tc = tv.textContainer {
+                            let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+                            let rect = lm.boundingRect(forGlyphRange: glyphRange, in: tc)
+                            let windowRect = tv.convert(rect, to: nil)
+                            let popupX = windowRect.midX - panelFrame.minX
+                            let popupY = (tv.window?.contentView?.frame.height ?? 600) - windowRect.minY - panelFrame.minY
+                            popup = (selected, 0, popupX, popupY)
+                        }
                     }
                 }
             }
