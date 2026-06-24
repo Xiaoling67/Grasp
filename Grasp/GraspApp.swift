@@ -16,7 +16,59 @@ import SwiftUI
             CommandMenu("Lecture") {
                 Button("New Lecture") { vm.showNewLectureModal = true }.keyboardShortcut("n", modifiers: [.command])
             }
+            CommandMenu("Edit") {
+                Button("Pause/Resume Recording") { vm.togglePause() }
+                    .keyboardShortcut("p", modifiers: [.command, .shift])
+                    .disabled(!vm.isRecording)
+
+                Divider()
+
+                Button("Save as Knowledge") { handleShortcutSave(vm: vm, type: "knowledge") }
+                    .keyboardShortcut("k", modifiers: [.command, .shift])
+                    .disabled(!vm.isRecording)
+
+                Button("Save as Language") { handleShortcutSave(vm: vm, type: "language") }
+                    .keyboardShortcut("l", modifiers: [.command, .shift])
+                    .disabled(!vm.isRecording || vm.activeLectureMode != "international")
+
+                Button("Search Selection") { handleShortcutSearch(vm: vm) }
+                    .keyboardShortcut("e", modifiers: [.command, .shift])
+                    .disabled(!vm.isRecording)
+
+                Divider()
+
+                Button("Export…") { vm.showExportModal = true }
+                    .keyboardShortcut("x", modifiers: [.command, .shift])
+            }
         }
+    }
+
+    // MARK: - Keyboard Shortcut Handlers
+
+    @MainActor
+    private func handleShortcutSave(vm: AppViewModel, type: String) {
+        let text = AppViewModel.lastSelectedText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            vm.showToast("No text selected.", type: "info")
+            return
+        }
+        if type == "language" && vm.activeLectureMode != "international" {
+            vm.showToast("Language saving is only available in International mode.", type: "info")
+            return
+        }
+        vm.handleSaveAction(type: type, text: text)
+    }
+
+    @MainActor
+    private func handleShortcutSearch(vm: AppViewModel) {
+        let text = AppViewModel.lastSelectedText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            vm.showToast("No text selected.", type: "info")
+            return
+        }
+        vm.triggerSearch(query: text, blockIndex: 0)
     }
 }
 

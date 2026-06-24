@@ -67,6 +67,21 @@ import Foundation; import SwiftUI
         let lid = db.startLecture(name: name, mode: mode, subject: subject)
         activeLectureId = lid; activeLectureName = name; activeLectureMode = mode; activeLectureSubject = subject ?? ""
         isRecording = true; isPaused = false
+
+        // Parse slides in parallel — does not block recording start
+        if let url = slideURL {
+            Task {
+                let pages = SlideParserService.parse(url: url)
+                guard !pages.isEmpty else {
+                    showToast("Could not read slides.", type: "error")
+                    return
+                }
+                let slides = await ds.generateSlideStructure(slides: pages, subject: activeLectureSubject)
+                db.saveSlideStructure(lectureId: lid, structure: slides)
+                self.slideStructure = slides
+            }
+        }
+
         let tab = TabItem(id: "live", type: .live, lectureId: lid, label: name ?? "Live Lecture")
         tabs = [tab] + tabs; activeTabId = "live"
         if !(await AudioService.requestPermission()) {
@@ -317,6 +332,7 @@ import Foundation; import SwiftUI
         if let ex = tabs.first(where: { $0.lectureId == id }) { activeTabId = ex.id; return }
         let t = TabItem(id: "past-\(id)", type: .past, lectureId: id, label: name ?? "Untitled")
         tabs.append(t); activeTabId = t.id
+        slideStructure = db.getSlideStructure(lectureId: id)
     }
     func closeTab(id: String) { tabs.removeAll { $0.id == id }; if activeTabId == id { activeTabId = tabs.last?.id } }
 
@@ -328,6 +344,9 @@ import Foundation; import SwiftUI
     private func resetLive() { liveBlocks = []; activeBlockId = nil; interimText = ""; interimBuf = ""
         noteBlocks = []; slideStructure = []; activeCard = nil; bottomTab = "current"
         sessionSaves = []; sessionSearches = []; coldCallPhase = nil; lastCC = nil; searchCache.removeAll() }
+
+    /// Holds the most recent text selection from the transcript, for keyboard shortcuts.
+    static var lastSelectedText: String = ""
 
     // Debug
     @Published var deepgramStatus = ""; @Published var transcriptsReceived = 0
