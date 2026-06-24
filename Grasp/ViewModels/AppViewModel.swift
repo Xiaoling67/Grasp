@@ -20,7 +20,7 @@ import Foundation; import SwiftUI
     @Published var conceptMap = [ConceptNode]()
 
     // Bottom panel (Spec 7.2: lectureStore)
-    @Published var activeCard: ActiveCardState? = nil; @Published var bottomTab = "current"
+    @Published var activeCard: ActiveCardState? = nil; @Published var bottomTab = "explain"
     @Published var searchStreaming = false; @Published var streamingTokens = ""
     @Published var sessionSaves = [SavedCard](); @Published var sessionSearches = [SearchResultState]()
 
@@ -290,7 +290,7 @@ import Foundation; import SwiftUI
                                       professional: "You've seen this before: \(detected.term)",
                                       intuition: "You previously looked this up. Here's a quick refresher if needed.")
             autoExplainResult = r; autoExplainStreaming = false
-            autoExplainNew = (bottomTab != "auto")
+            autoExplainNew = (bottomTab != "explain")
             MemoryService.shared.recordInteraction(concept: detected.term, action: .autoExplain)
             return
         case .preventive, .neverSeen, .dismissed:
@@ -312,7 +312,7 @@ import Foundation; import SwiftUI
             let intu = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
             let r = SearchResultState(id: rid, query: detected.term, professional: pro, intuition: intu)
             autoExplainResult = r; autoExplainStreaming = false
-            autoExplainNew = (bottomTab != "auto")
+            autoExplainNew = (bottomTab != "explain")
             MemoryService.shared.recordInteraction(concept: detected.term, action: .autoExplain)
         } catch { autoExplainStreaming = false }
     }
@@ -348,7 +348,7 @@ import Foundation; import SwiftUI
         let ck = "\(lid):\(query.lowercased().trimmingCharacters(in: .whitespaces))"
         if let cached = searchCache[ck] {
             let r = SearchResultState(id: UUID().uuidString, query: query, professional: cached.0, intuition: cached.1)
-            sessionSearches.insert(r, at: 0); activeCard = .search(r); bottomTab = "current"; return
+            sessionSearches.insert(r, at: 0); activeCard = .search(r); bottomTab = "explain"; return
         }
         let rid = UUID().uuidString; searchStreaming = true; streamingTokens = ""
         let ctx = db.getRecentBlocks(lectureId: lid, beforeIndex: blockIndex, limit: 10)
@@ -373,7 +373,7 @@ import Foundation; import SwiftUI
             var r = SearchResultState(id: rid, query: query); r.error = "Search failed. Check your connection."
             sessionSearches.insert(r, at: 0); activeCard = .search(r); searchStreaming = false
         }
-        bottomTab = "current"
+        bottomTab = "explain"
     }
 
     // MARK: - Save (Spec 10.3)
@@ -381,7 +381,7 @@ import Foundation; import SwiftUI
         guard let lid = activeLectureId else { return }
         let draft = SaveDraft(type: type, original: text, translation: nil, lectureId: lid)
         activeCard = .save(draft)
-        bottomTab = "current"
+        bottomTab = "explain"
         if activeLectureMode == "international" {
             Task {
                 let trans = try? await tr.translate(text: text, subject: activeLectureSubject.isEmpty ? nil : activeLectureSubject)
@@ -431,7 +431,7 @@ import Foundation; import SwiftUI
 
     // MARK: - Reset
     private func resetLive() { liveBlocks = []; activeBlockId = nil; interimText = ""; interimBuf = ""
-        noteBlocks = []; slideStructure = []; conceptMap = []; activeCard = nil; bottomTab = "current"
+        noteBlocks = []; slideStructure = []; conceptMap = []; activeCard = nil; bottomTab = "explain"
         sessionSaves = []; sessionSearches = []; coldCallPhase = nil; lastCC = nil; searchCache.removeAll() }
 
     /// Holds the most recent text selection from the transcript, for keyboard shortcuts.
