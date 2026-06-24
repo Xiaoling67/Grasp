@@ -29,8 +29,8 @@ final class QwenTranslationService {
         var r = URLRequest(url: dURL); r.httpMethod = "POST"
         r.setValue("Bearer \(dk)", forHTTPHeaderField: "Authorization")
         r.setValue("application/json", forHTTPHeaderField: "Content-Type"); r.timeoutInterval = 15
-        let sc = subject.map { "The lecture is about \"\($0)\" — use accurate domain-specific terminology." } ?? ""
-        let b: [String: Any] = ["model":"deepseek-chat", "messages":[["role":"system","content":"You are a professional translator specializing in academic and university lecture content. \(sc) Translate the given English text to Simplified Chinese. Return only the translation, no explanations."], ["role":"user","content":t]], "stream":false, "max_tokens":1000]
+        let sc = subject.map { " The lecture is about \"\($0)\" — preserve domain-specific terms consistently (e.g. keep English abbreviations like NPV, GDP, or translate them uniformly)." } ?? ""
+        let b: [String: Any] = ["model":"deepseek-chat", "messages":[["role":"system","content":"You are a professional academic translator. Translate English university lecture speech to natural, fluent Simplified Chinese.\(sc) Preserve technical terms consistently. Return ONLY the translation — no notes, no explanations, no alternatives."], ["role":"user","content":t]], "stream":false, "max_tokens":1000]
         r.httpBody = try JSONSerialization.data(withJSONObject: b)
         let (d, _) = try await URLSession.shared.data(for: r)
         let j = try JSONSerialization.jsonObject(with: d) as? [String: Any]

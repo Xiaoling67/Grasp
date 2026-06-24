@@ -8,7 +8,7 @@ struct BottomPanelView: View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
                 HStack(spacing: 2) {
-                    tabBtn("Current", "current"); tabBtn("Saved", "saved", c: vm.sessionSaves.count); tabBtn("Searched", "searched", c: vm.sessionSearches.count); Spacer()
+                    tabBtn("Current", "current"); tabBtn("Saved", "saved", c: vm.sessionSaves.count); tabBtn("Searched", "searched", c: vm.sessionSearches.count); autoTabBtn(); Spacer()
                 }.padding(.horizontal, 16).frame(height: 32).overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 1), alignment: .bottom)
                 bodyContent
             }.frame(maxWidth: .infinity)
@@ -27,6 +27,19 @@ struct BottomPanelView: View {
         }.buttonStyle(.plain)
     }
 
+    func autoTabBtn() -> some View {
+        Button(action: { vm.bottomTab = "auto"; vm.autoExplainNew = false }) {
+            HStack(spacing: 4) {
+                Text("Auto").font(.inter(size: 11, weight: vm.bottomTab == "auto" ? .medium : .regular))
+                    .foregroundColor(vm.bottomTab == "auto" ? Color(hex: "0A0A0A") : Color(hex: "9A9A9A"))
+                if vm.autoExplainNew || vm.autoExplainStreaming {
+                    Circle().fill(Color(hex: "7C3AED")).frame(width: 5, height: 5)
+                }
+            }.padding(.horizontal, 10).padding(.vertical, 4)
+                .background(vm.bottomTab == "auto" ? Color(hex: "F8F8F8") : Color.clear).cornerRadius(4)
+        }.buttonStyle(.plain)
+    }
+
     @ViewBuilder var bodyContent: some View {
         switch vm.bottomTab {
         case "current":
@@ -35,6 +48,9 @@ struct BottomPanelView: View {
             else { Text("Select text in the transcript to get an AI explanation").font(.inter(size: 12)).foregroundColor(Color(hex: "C0C0C0")).frame(maxWidth: .infinity, maxHeight: .infinity) }
         case "saved": listView(vm.sessionSaves, isSave: true)
         case "searched": searchListView(vm.sessionSearches)
+        case "auto":
+            if vm.autoExplainResult != nil || vm.autoExplainStreaming { AutoExplainCardView() }
+            else { Text("Auto-explain activates when the professor uses a term you may not know.").font(.inter(size: 12)).foregroundColor(Color(hex: "C0C0C0")).multilineTextAlignment(.center).padding(16).frame(maxWidth: .infinity, maxHeight: .infinity) }
         default: EmptyView()
         }
     }

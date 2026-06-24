@@ -11,10 +11,10 @@ final class DeepgramService: NSObject {
     private(set) var isConnected = false
     var onFinal: ((String) -> Void)?; var onInterim: ((String) -> Void)?; var onEnd: (() -> Void)?; var onStatus: ((String) -> Void)?
 
-    func connect(sr: Double) {
+    func connect(sr: Double, keywords: [String] = []) {
         isConnected = false; pending.removeAll()
         var c = URLComponents(); c.scheme = "wss"; c.host = "api.deepgram.com"; c.path = "/v1/listen"
-        c.queryItems = [
+        var items: [URLQueryItem] = [
             URLQueryItem(name: "model", value: "nova-3"),
             URLQueryItem(name: "language", value: "en-US"),
             URLQueryItem(name: "encoding", value: "linear16"),
@@ -26,6 +26,9 @@ final class DeepgramService: NSObject {
             URLQueryItem(name: "filler_words", value: "false"),
             URLQueryItem(name: "utterance_end_ms", value: "2000"),
         ]
+        // PRD P1-4: inject domain keywords to improve terminology recognition
+        for kw in keywords.prefix(20) { items.append(URLQueryItem(name: "keyterm", value: kw)) }
+        c.queryItems = items
         guard let u = c.url else { return }
         let s = URLSession(configuration: .default, delegate: self, delegateQueue: .main)
         session = s; task = s.webSocketTask(with: u, protocols: ["token", key])

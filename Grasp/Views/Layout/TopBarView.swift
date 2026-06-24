@@ -7,31 +7,31 @@ struct TopBarView: View {
         HStack(spacing: 8) {
             Spacer().frame(width: 64)
             // Sidebar toggle — 16x16 SVG icon
-            Button(action: { vm.sidebarVisible.toggle() }) { SidebarIcon().frame(width: 28, height: 28) }.buttonStyle(.plain)
+            Button(action: { vm.sidebarVisible.toggle() }) { SidebarIcon().frame(width: 18, height: 18) }.buttonStyle(.plain)
             // + New Lecture pill — 12px/500/#5A5A5A, pill radius, 1px #E8E8E8
             Button(action: { vm.showNewLectureModal = true }) {
-                Text("+ New Lecture").font(.inter(size: 12, weight: .medium)).foregroundColor(Color(hex: "5A5A5A"))
-                    .padding(.horizontal, 10).padding(.vertical, 4).background(Color.white).cornerRadius(980)
+                Text("+ New Lecture").font(.inter(size: 11)).foregroundColor(Color(hex: "5A5A5A"))
+                    .padding(.horizontal, 8).padding(.vertical, 1).background(Color.white).cornerRadius(980)
                     .overlay(RoundedRectangle(cornerRadius: 980).stroke(Color(hex: "E8E8E8"), lineWidth: 1))
             }.buttonStyle(.plain)
             // Tabs
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 2) { ForEach(vm.tabs) { t in TabPill(tab: t) } }.padding(.vertical, 4)
+                HStack(spacing: 2) { ForEach(vm.tabs) { t in TabPill(tab: t) } }.padding(.vertical, 1)
             }
             Spacer()
             // Recording controls — ⏸/▶ pause, ■ stop
             if vm.isRecording {
                 HStack(spacing: 4) {
                     Button(action: { vm.togglePause() }) {
-                        Text(vm.isPaused ? "▶" : "⏸").font(.inter(size: 12)).foregroundColor(Color(hex: "5A5A5A")).frame(width: 28, height: 28)
-                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "E8E8E8"), lineWidth: 1))
+                        Text(vm.isPaused ? "▶" : "⏸").font(.inter(size: 10)).foregroundColor(Color(hex: "5A5A5A")).frame(width: 18, height: 16)
+                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color(hex: "E8E8E8"), lineWidth: 1))
                     Button(action: { Task { await vm.stopLecture() } }) {
-                        Text("■").font(.inter(size: 10)).foregroundColor(Color(hex: "B91C1C")).frame(width: 28, height: 28)
-                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "DC3545").opacity(0.3), lineWidth: 1))
-                }.padding(.trailing, 12)
+                        Text("■").font(.inter(size: 9)).foregroundColor(Color(hex: "B91C1C")).frame(width: 18, height: 16)
+                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color(hex: "DC3545").opacity(0.3), lineWidth: 1))
+                }.padding(.trailing, 8)
             }
         }
-        .frame(height: 38).background(Color.white)
+        .frame(height: 18).background(Color.white)
         .overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 1), alignment: .bottom)
     }
 }
@@ -58,10 +58,10 @@ struct TabPill: View {
                     RoundedRectangle(cornerRadius: 1).fill(Color(hex: "1A5FD4")).frame(width: 2, height: i==1 ? 8 : 4)
                 }}.frame(width: 10)
             }
-            Text(tab.label).font(.inter(size: 12)).lineLimit(1)
-            if !l || !vm.isRecording { Button(action: { vm.closeTab(id: tab.id) }) { Text("×").font(.inter(size: 13)) }.buttonStyle(.plain) }
+            Text(tab.label).font(.inter(size: 12, weight: .light)).lineLimit(1)
+            if !l || !vm.isRecording { Button(action: { vm.closeTab(id: tab.id) }) { Text("×").font(.inter(size: 11)) }.buttonStyle(.plain) }
         }
-        .padding(EdgeInsets(top: 3, leading: 8, bottom: 3, trailing: 10))
+        .padding(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 8))
         .background(a && l ? Color(hex: "E8F0FE") : a ? Color.white : Color.clear).cornerRadius(4)
         .overlay(a && l ? RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5D8FC"), lineWidth: 1) : a ? RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "E8E8E8"), lineWidth: 1) : nil)
         .shadow(color: a && !l ? .black.opacity(0.05) : .clear, radius: 3, y: 1)

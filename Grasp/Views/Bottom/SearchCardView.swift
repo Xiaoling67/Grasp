@@ -4,6 +4,7 @@ import SwiftUI
 struct SearchCardView: View {
     @EnvironmentObject var vm: AppViewModel
     @State private var note = ""; @State private var followUp = ""; @State private var saved = false
+    @State private var engageTimer: Timer? = nil
 
     private var result: SearchResultState? { if case .search(let r) = vm.activeCard { return r }; return nil }
     private var pro: String { vm.searchStreaming ? vm.streamingTokens : (result?.professional ?? "") }
@@ -13,7 +14,7 @@ struct SearchCardView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("SEARCH").font(.inter(size: 11, weight: .semibold)).foregroundColor(Color(hex: "5A5A5A"))
-                Spacer(); Button("✕") { vm.activeCard = nil }.buttonStyle(.plain).font(.inter(size: 12)).foregroundColor(Color(hex: "C0C0C0"))
+                Spacer(); Button("✕") { dismiss() }.buttonStyle(.plain).font(.inter(size: 12)).foregroundColor(Color(hex: "C0C0C0"))
             }.padding(.horizontal, 12).padding(.vertical, 8)
                 .overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5), alignment: .bottom)
 
@@ -38,8 +39,32 @@ struct SearchCardView: View {
                 HStack { Spacer(); Button(action: saveToK) { Text(saved ? "Saved ✓" : "+ Save to Knowledge").font(.inter(size: 11, weight: .medium)) }.buttonStyle(.bordered).disabled(saved) }.padding(.horizontal, 12).padding(.vertical, 8).overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5), alignment: .top)
             }
         }.background(Color.white).cornerRadius(8).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "E8E8E8"), lineWidth: 0.5)).shadow(color: .black.opacity(0.06), radius: 8, y: 1)
+        .onAppear { if !vm.searchStreaming { startEngageTimer() } }
+        .onChange(of: vm.searchStreaming) { streaming in if !streaming { startEngageTimer() } }
     }
 
-    func send() { guard !followUp.isEmpty, let lid = vm.activeLectureId else { return }; let q = followUp.trimmingCharacters(in: .whitespacesAndNewlines); followUp = ""; vm.triggerSearch(query: q, blockIndex: 9999, lectureId: lid) }
-    func saveToK() { guard let r = result else { return }; let sid = DatabaseService.shared.createSave(lectureId: vm.activeLectureId, blockId: nil, type: "knowledge", original: pro + (intu.isEmpty ? "" : " " + intu), translation: nil, note: note.isEmpty ? nil : note); DatabaseService.shared.markSearchSaved(id: r.id); saved = true }
+    func send() {
+        guard !followUp.isEmpty, let lid = vm.activeLectureId else { return }
+        let q = followUp.trimmingCharacters(in: .whitespacesAndNewlines); followUp = ""
+        if let r = result { DatabaseService.shared.markSearchEngaged(id: r.id) }
+        vm.triggerSearch(query: q, blockIndex: 9999, lectureId: lid)
+    }
+    func saveToK() {
+        guard let r = result else { return }
+        DatabaseService.shared.createSave(lectureId: vm.activeLectureId, blockId: nil, type: "knowledge", original: pro + (intu.isEmpty ? "" : " " + intu), translation: nil, note: note.isEmpty ? nil : note)
+        DatabaseService.shared.markSearchSaved(id: r.id)
+        DatabaseService.shared.markSearchEngaged(id: r.id)
+        saved = true
+    }
+    func dismiss() {
+        if let r = result { DatabaseService.shared.markSearchDismissed(id: r.id) }
+        engageTimer?.invalidate(); engageTimer = nil
+        vm.activeCard = nil
+    }
+    func startEngageTimer() {
+        engageTimer?.invalidate()
+        engageTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { _ in
+            if let r = result { DatabaseService.shared.markSearchEngaged(id: r.id) }
+        }
+    }
 }
