@@ -105,7 +105,8 @@ final class DatabaseService {
     // Blocks
     func saveBlock(lectureId: String, blockIndex: Int, textEn: String, textZh: String?) -> String {
         let id = uid()
-        run("INSERT INTO blocks(id,lecture_id,block_index,text_en,text_zh,is_final,started_at) VALUES(?,?,?,?,?,1,?)", [id, lectureId, blockIndex, textEn, textZh, now()])
+        let ts = now()
+        run("INSERT INTO blocks(id,lecture_id,block_index,text_en,text_zh,is_final,started_at,created_at) VALUES(?,?,?,?,?,1,?,?)", [id, lectureId, blockIndex, textEn, textZh, ts, ts])
         return id
     }
     func setBlockTranslation(lectureId: String, blockIndex: Int, textZh: String) {
