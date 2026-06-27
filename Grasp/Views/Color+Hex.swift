@@ -55,4 +55,33 @@ extension Color {
     static let selectionBg       = Color(hex: "DBEAFE")
     static let hoverBg           = Color(hex: "F5F5F5")
     static let aiNewBorder       = Color(hex: "1A5FD4")
+
+    // — Additional tokens for commonly-used colors —
+    static let fillTertiary      = Color(hex: "F8F8F8")   // light content background
+    static let accentGreen       = Color(hex: "15803D")   // success / saved text
+    static let accentRed         = Color(hex: "B91C1C")   // error / stop
+    static let accentAmber       = Color(hex: "F59E0B")   // warning
+    static let pillBorderGray    = Color(hex: "E8E8E8")   // 1px border close to divider
+    static let mutedGray         = Color(hex: "C0C0C0")   // secondary icon/text
+    static let nearBlack         = Color(hex: "0A0A0A")   // near-black text
+    static let mediumGray        = Color(hex: "5A5A5A")   // medium gray text
+    static let lightBlueBg       = Color(hex: "E8F0FE")   // selected tab background
+    static let lightBlueBorder   = Color(hex: "C5D8FC")   // selected tab border
+    static let lightGreenBg      = Color(hex: "F0FDF4")   // green badge bg
+    static let knowledgeBlue     = Color(hex: "3B67D6")   // knowledge badge text
+    static let linkBlue          = Color(hex: "3B7DD8")   // user note link text
+    static let highlightBlue     = Color(hex: "4A8BFA")   // gradient highlight
+    static let veryLightGray     = Color(hex: "D0D0D0")   // empty state text
+    static let statusGreen       = Color(hex: "34C759")   // status badge green
+    static let statusBlue        = Color(hex: "007AFF")   // status badge blue
+    static let statusGray        = Color(hex: "8E8E93")   // status badge gray
+    static let statusOrange      = Color(hex: "FF9500")   // status badge orange
+    static let amberBorder       = Color(hex: "FBBF24")   // amber border
+    static let lightPurpleBg     = Color(hex: "EDE9FE")   // purple card bg
+    static let searchCountGray   = Color(hex: "999999")   // search count text
+    static let badgeBgGray       = Color(hex: "F0F0F0")   // badge background
+    static let stopBorderRed     = Color(hex: "DC3545")   // stop button border
+    static let notesDividerGray  = Color(hex: "AAAAAA")   // notes divider
+    static let deepBlue          = Color(hex: "3B7DD8")   // user note text
+    static let pillBorderColor   = Color(hex: "E8E8E8")   // tab/border pill
 }

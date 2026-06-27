@@ -7,24 +7,24 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 24) {
-            Text("Settings").font(.inter(size: 16, weight: .semibold)).foregroundColor(Color(hex: "0A0A0A"))
+            Text("Settings").font(.inter(size: 16, weight: .semibold)).foregroundColor(Color.nearBlack)
             // Default Mode
-            VStack(alignment: .leading, spacing: 12) { Text("Default Mode").font(.inter(size: 13, weight: .semibold)).foregroundColor(Color(hex: "0A0A0A"))
-                HStack { Text("Lecture mode").font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A")); Spacer(); Picker("", selection: $mode) { Text("Standard").tag("standard"); Text("International").tag("international") }.pickerStyle(.menu).frame(width: 160).onChange(of: mode) { DatabaseService.shared.setSetting(key: "defaultMode", value: mode) } }
-                HStack { Text("Target language").font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A")); Spacer(); TextField("e.g. zh-CN", text: $tl).textFieldStyle(.plain).font(.inter(size: 12)).multilineTextAlignment(.trailing).frame(width: 160) }
+            VStack(alignment: .leading, spacing: 12) { Text("Default Mode").font(.inter(size: 13, weight: .semibold)).foregroundColor(Color.nearBlack)
+                HStack { Text("Lecture mode").font(.inter(size: 13)).foregroundColor(Color.mediumGray); Spacer(); Picker("", selection: $mode) { Text("Standard").tag("standard"); Text("International").tag("international") }.pickerStyle(.menu).frame(width: 160).onChange(of: mode) { DatabaseService.shared.setSetting(key: "defaultMode", value: mode) } }
+                HStack { Text("Target language").font(.inter(size: 13)).foregroundColor(Color.mediumGray); Spacer(); TextField("e.g. zh-CN", text: $tl).textFieldStyle(.plain).font(.inter(size: 12)).multilineTextAlignment(.trailing).frame(width: 160) }
             }
             // Display
-            VStack(alignment: .leading, spacing: 12) { Text("Display").font(.inter(size: 13, weight: .semibold)).foregroundColor(Color(hex: "0A0A0A"))
-                HStack { Text("Font size").font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A")); Spacer(); Picker("", selection: $fs) { Text("Small").tag("small"); Text("Medium").tag("medium"); Text("Large").tag("large") }.pickerStyle(.menu).frame(width: 160) }
-                Toggle("Show translation", isOn: $st).font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A"))
-                Toggle("Hover to freeze scroll", isOn: $hf).font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A"))
+            VStack(alignment: .leading, spacing: 12) { Text("Display").font(.inter(size: 13, weight: .semibold)).foregroundColor(Color.nearBlack)
+                HStack { Text("Font size").font(.inter(size: 13)).foregroundColor(Color.mediumGray); Spacer(); Picker("", selection: $fs) { Text("Small").tag("small"); Text("Medium").tag("medium"); Text("Large").tag("large") }.pickerStyle(.menu).frame(width: 160) }
+                Toggle("Show translation", isOn: $st).font(.inter(size: 13)).foregroundColor(Color.mediumGray)
+                Toggle("Hover to freeze scroll", isOn: $hf).font(.inter(size: 13)).foregroundColor(Color.mediumGray)
             }
             // Knowledge Profile
             Button(action: { showKnowledgeProfile = true }) {
                 HStack {
-                    Text("Knowledge Profile").font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A"))
+                    Text("Knowledge Profile").font(.inter(size: 13)).foregroundColor(Color.nearBlack)
                     Spacer()
-                    Text("\(knownCount) known").font(.inter(size: 11)).foregroundColor(Color(hex: "C0C0C0"))
+                    Text("\(knownCount) known").font(.inter(size: 11)).foregroundColor(Color.mutedGray)
                 }
             }.buttonStyle(.plain)
             Spacer()

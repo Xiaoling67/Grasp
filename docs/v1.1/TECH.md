@@ -1,227 +1,136 @@
-# Grasp v1.1 — Tech Implementation Plan
+# Grasp v1.1-r2 — Implementation Plan
 
-**Author:** Engineer (code audit)
 **Date:** 2026-06-27
-**Status:** Implementation complete — audit against PRD v1.1
+**Version:** 1.1-r2
+**Engineer:** Hermes Agent (DeepSeek)
 
----
+## Overview
 
-## Overview of Architecture (Current State)
+This document describes the implementation of v1.1-r2, a major rewrite of the Grasp app focused on:
+1. **Instant selection popup** — no debounce, ≤1 frame appearance
+2. **Apple Notes-style AI Notes panel** — flat rich-text, no concept tree
+3. **All movable dividers** — both vertical and horizontal draggable
+4. **UI polish** — design token system, semantic colors, consistent spacing
 
-Grasp is a single-window macOS app built with SwiftUI + AppKit, targeting macOS 14.0+.
-The architecture follows a ViewModel-driven pattern:
+## Files Modified
 
+| File | Change |
+|------|--------|
+| `Grasp/Views/Color+Hex.swift` | Added complete design token system (Spacing, CornerRadius, AppTypography, semantic Color extensions) |
+| `Grasp/Models/Models.swift` | Removed `ConceptNode` struct and concept map related types |
+| `Grasp/Services/DatabaseService.swift` | Removed `concept_map` table creation, `saveConceptMap`, `loadConceptMap`, `deleteConceptMap` methods |
+| `Grasp/Services/DeepSeekService.swift` | Removed `generateConceptMapUpdate` method (~77 lines) |
+| `Grasp/ViewModels/AppViewModel.swift` | Removed concept map timer/properties/methods; added `topRowRatio`, `deepgramStatus`; simplified note management |
+| `Grasp/Views/Transcript/TranscriptPanelView.swift` | Removed 80ms `asyncAfter` debounce; instant synchronous selection popup; minimum 2 chars; punctuation check; above/below positioning |
+| `Grasp/Views/Transcript/SelectionPopupView.swift` | Rewrote with `NSVisualEffectView` material background, SF Symbols, pill shape, accent colors |
+| `Grasp/Views/Notes/NotesPanelView.swift` | Full rewrite: removed all tree/concept map code; Apple Notes-style flat rich-text editor with `NSTextView`, Enter/Shift+Enter, blue border animation, hover delete, rich text persistence |
+| `Grasp/Views/Layout/LiveTabView.swift` | Added draggable horizontal divider (`HorizontalDragHandle`), `topRowRatio` binding, cursor changes on hover; updated all colors/spacing to design tokens |
+
+## Detailed Changes
+
+### 1. Design Token System (`Color+Hex.swift`)
+
+Added semantic enums and color extensions:
+- **`Spacing`** — 4px grid: xxxs(2), xxs(4), xs(8), sm(12), md(16), lg(24), xl(32), xxl(48)
+- **`CornerRadius`** — card(8), popup(12), pill(980)
+- **`AppTypography`** — body(13), caption(11), small(10), title(14)
+- **`Color` extensions** — surfacePrimary, surfaceSecondary, textPrimary, textSecondary, textTertiary, accentBlue, accentPurple, divider, selectionBg, hoverBg, aiNewBorder
+
+### 2. Instant Selection Popup (`TranscriptPanelView.swift`)
+
+**Before (v1.1-r1):**
+- 80ms `DispatchQueue.main.asyncAfter` debounce
+- Minimum 3-character selection
+- White background with border
+- `asyncAfter` adds ~80-150ms latency
+
+**After (v1.1-r2):**
+- **Zero debounce** — `NSTextView.didChangeSelectionNotification` handled synchronously on `.main` queue
+- **Minimum 2 characters** (checks for alphanumeric content, ignores punctuation-only)
+- **Popups above selection** by default, below if clipped
+- Uses `NSVisualEffectView` with `.popover` material for native macOS look
+- SF Symbols: Search (magnifyinglass), Save K (bookmark.fill), Save L (character.bubble.fill)
+- `.accentBlue` color for Search button
+
+### 3. Apple Notes Panel (`NotesPanelView.swift`)
+
+**Before (v1.1-r1):**
+- Hierarchical concept tree with indented bullets (▸, •, ◦)
+- Depth-based indentation (18px per level)
+- `ConceptNode`, `ConceptNodeRow`, `buildConceptTree()`, `flattenNode()`, `collectChildren()`
+- SwiftUI `TextField` for editing
+- Hardcoded hex colors
+
+**After (v1.1-r2):**
+- **Flat rich-text list** — no bullets, no indent, no tree
+- **NSTextView-based inline editing** — wrapped in `NSViewRepresentable`
+- **Rich text support**: ⌘B (bold), ⌘I (italic), ⌘U (underline) — native NSTextView handles these
+- **Enter** creates new note below; **Shift+Enter** inserts line break within note
+- **Auto-save on blur** — rich text persisted as HTML in SQLite
+- **Delete empty note on blur** — removes empty user-created notes
+- **New AI notes** slide in with opacity + vertical offset animation
+- **Blue left border** (3px, `#1A5FD4`) on new AI notes, fades after 5 seconds
+- **Hover × button** for deletion with fade animation
+- **Design tokens** throughout for colors, spacing, typography
+
+**Key architectural decisions:**
+- `NSTextFieldRepresentable` wraps NSTextView with Coordinator for delegate callbacks
+- Rich text saved as HTML in `note_blocks.content` column (backward compatible with plain text)
+- `AttributedTextDisplay` renders HTML back in display mode
+- The `NoteBlock` model still uses `content` (String) — now stores HTML instead of plain text
+
+### 4. All Movable Dividers (`LiveTabView.swift`)
+
+**Vertical divider:**
+- Kept existing implementation with `DragGesture`
+- Now shows `NSCursor.resizeLeftRight` on hover
+- Uses design tokens for colors
+
+**Horizontal divider (NEW):**
+- `HorizontalDragHandle` view — 12px tall drag area
+- 1px `#E5E5E5` top/bottom lines with 10px transparent hit area
+- `DragGesture(minimumDistance: 0)` updates `vm.topRowRatio`
+- Range: 0.30-0.80 (top row), default: 0.55
+- `NSCursor.resizeUpDown` on hover
+- Both columns resize simultaneously
+
+### 5. Concept Map Removal
+
+**Deleted from codebase:**
+- `ConceptNode` struct (`Models.swift`)
+- `conceptMap` property, `conceptMapTimer`, `lastConceptMapFire`, `startConceptMapTimer()`, `fireConceptMapUpdate()` (`AppViewModel.swift`)
+- `generateConceptMapUpdate()` method (`DeepSeekService.swift`)
+- `saveConceptMap()`, `loadConceptMap()`, `deleteConceptMap()` (`DatabaseService.swift`)
+- `concept_map` table creation in `DatabaseService.init()`
+- `buildConceptTree()`, `collectChildren()`, `flattenNode()`, `conceptNodeView()`, `conceptSlideSection()`, `ConceptNodeRow` (`NotesPanelView.swift`)
+- `highlightBlocksForConcept()`, `addConceptToProfile()` (`AppViewModel.swift`)
+
+**Preserved:**
+- `NoteBlock` model (used for flat notes)
+- `saveNoteBlock`, `updateNoteBlock`, `deleteNoteBlock`, `getNoteBlocks` in DatabaseService
+- `handleCopyToNotes`, `updateNote`, `deleteNote` in AppViewModel
+
+## Build Verification
+
+The project builds successfully with:
 ```
-GraspApp.swift          ← Entry point, keyboard shortcut commands, RootView
-├── TopBarView         ← Title + window controls
-├── SidebarView        ← Navigation sidebar
-└── MainContent
-    ├── LiveTabView    ← Live lecture 2×2 grid layout
-    │   ├── TranscriptPanelView    (top-left, sealed blocks + interim)
-    │   ├── NotesPanelView         (top-right, concept map / flat notes)
-    │   ├── AutoExplainBottomQuadrant (bottom-left, always visible)
-    │   └── ContextualBottomQuadrant  (bottom-right, priority chain)
-    ├── PastLectureView
-    ├── HomeView / SettingsView / SavedItemsView / SearchHistoryView
-    └── KnowledgeProfileView       (modal sheet)
+xcodebuild -project Grasp.xcodeproj -scheme Grasp build
 ```
 
-**Key services:**
-| Service | Role |
-|---------|------|
-| `DatabaseService` | SQLite (raw `sqlite3_open`) — lectures, blocks, notes, saves, searches, concept_map, student_knowledge |
-| `DeepgramService` | WebSocket streaming to Deepgram Nova-3 |
-| `DeepSeekService` | HTTP API for search, notes, auto-explain, concept map, cold call, slide parsing, keywords |
-| `MemoryService` | Knowledge Profile CRUD (`@unchecked Sendable`, singleton) |
-| `QwenTranslationService` | Qwen-MT Flash → DeepSeek fallback for translation |
-| `SlideParserService` | PDF text extraction |
-| `AudioService` | Microphone capture |
+Only warnings: (1) Run script build phase 'Copy Inter Font' — pre-existing, non-blocking. (2) Deprecated `onChange(of:perform:)` in `SearchCardView.swift` — pre-existing, non-blocking.
 
-**State:** `AppViewModel` (`@MainActor ObservableObject`) — holds all app state at module scope. ~500 lines.
+## Edge Cases & Gotchas
 
----
+1. **Empty note deletion**: If user creates a note, presses Enter (creating empty note below), then blurs — the empty note is deleted. The original created note remains.
+2. **Rich text fallback**: If HTML content cannot be parsed, `AttributedTextDisplay` falls back to plain text rendering.
+3. **NSTextView focus**: The `makeFirstResponder` call is dispatched async to ensure the view hierarchy is ready.
+4. **Blue border timing**: New AI notes get a 3px blue left border that fades over 1 second after 5 seconds.
+5. **Popup positioning**: Above selection with 4px gap; if above would clip (y < 80), positions below.
+6. **Punctuation-only selection**: Ignored by the popup trigger (checks for isLetter || isNumber characters).
 
-## Feature Audit: Each PRD Item vs Current Code
+## Future Considerations
 
-### 1. Layout — 2×2 Grid
-
-| PRD Requirement | Status | Details |
-|----------------|--------|---------|
-| 65/35 vertical split (top/bottom) | ✅ | `LiveTabView.topRowHeight` = `(geo.size.height - 5) * 0.65` |
-| 55/45 horizontal split (left/right) | ⚠️ Partial | `notesWidth` hardcoded to `300.0` as initial value, not `geo.size.width * 0.45`. Drag updates it. |
-| Draggable vertical divider (1px, #E8E8E8) | ✅ | Drag gesture on `Rectangle().fill(Color(hex:"E8E8E8"))` with min=200, max=500 |
-| Horizontal divider (5px, 1px #E8E8E8 top/bottom, 3px #F8F8F8 gap) | ✅ | `frame(height:5)` with overlays |
-| Min window 960×640, default 1280×800 | ✅ | `minFrame(minWidth:960, minHeight:640)`, `.defaultSize(width:1280, height:800)` |
-| Left column min:200px, max:500px | ✅ | `max(200, min(500, ...))` in drag handler |
-
-**Changes needed:** None urgent. Default `notesWidth = 300` is close enough for most screens; user adjusts via drag handle.
-
----
-
-### 2. Concept Map (v1.1)
-
-| PRD Requirement | Status | Details |
-|----------------|--------|---------|
-| 15s rolling window timer | ✅ | `Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true)` |
-| Hierarchical tree (parentId) | ✅ | `ConceptNode.parentId: String?`, tree built in `buildConceptTree()` |
-| Indented outline rendering (1em per level) | ✅ | `ConceptNodeRow` with `Spacer().frame(width: CGFloat(depth) * 18)` |
-| Dual render path (concept map vs flat notes) | ✅ | `conceptMap.isEmpty` check renders either tree or flat `NoteRow` |
-| Click concept → highlights transcript blocks | ✅ | `highlightBlocksForConcept()` — sets `highlightedBlockIds`, auto-clears after 3s |
-| Right-click → Add to Knowledge Profile | ✅ | `contextMenu { Button("Add to Knowledge Profile") }` |
-| Manual note editing (add/edit/delete) | ✅ | `NoteRow` edit state, `addNote()`, `deleteNote()`, `updateNote()` |
-| Concept map stored in SQLite | ✅ | `concept_map` table with `saveConceptMap` / `loadConceptMap` |
-| DeepSeek returns full map update (not diff) | ✅ | `generateConceptMapUpdate()` returns complete updated nodes array |
-
-**Changes needed:** None.
-
----
-
-### 3. Auto Explain + Knowledge Profile
-
-| PRD Requirement | Status | Details |
-|----------------|--------|---------|
-| Per sealed block trigger | ✅ | `autoExplain()` called from `seal()` — one check per sealed block |
-| DeepSeek detects 1 unfamiliar term (confidence ≥ 0.65) | ✅ | `detectUnfamiliarTerm()` returns `(term, confidence)`. Code uses `> 0.65` (off by epsilon) |
-| Knowledge Profile via SQLite | ✅ | `student_knowledge` table, `MemoryService` with 5 statuses |
-| `known` → skip | ✅ | `case .known: return` |
-| `lookedUp` → 1-line reminder | ✅ | Shows "You've seen this before" card |
-| `neverSeen` → full explanation | ✅ | Streamed via `streamSearch()` |
-| Bottom-left quadrant, always visible | ✅ | `AutoExplainBottomQuadrant` in `LiveTabView` — never removed from hierarchy |
-| Idle: "Watching for unfamiliar terms…" (#C0C0C0) | ✅ | Text with `Color(hex: "C0C0C0")` |
-| Purple dot (#7C3AED, 5px) | ✅ | `Circle().fill(Color(hex: "7C3AED")).frame(width:5, height:5)` |
-| Streaming explanation token-by-token | ✅ | `autoExplainTokens` accumulates, `autoExplainStreaming` drives cursor |
-| "Save to Knowledge" button | ✅ | `AutoExplainCardView.saveToK()` |
-| Results never auto-enter notes | ✅ | `saveToK()` writes to `saves` table, not `note_blocks` |
-
-**Changes needed:** None.
-
----
-
-### 4. Selection Popup + Search + Save
-
-| PRD Requirement | Status | Details |
-|----------------|--------|---------|
-| NotificationCenter (replaces NSEvent) | ✅ | `NSTextView.didChangeSelectionNotification` observer |
-| 80ms debounce | ✅ | `DispatchQueue.main.asyncAfter(deadline: .now() + 0.08)` |
-| Three buttons: Search, K, L | ✅ | `SelectionPopupView` — K, L, Search, plus extra "Notes" button |
-| L only in International mode | ✅ | `vm.activeLectureMode == "international"` check |
-| DeepSeek returns definition + analogy (| delimiter) | ✅ | `streamSearch()` prompt outputs "... | ..." |
-| Context: last 10 sealed blocks | ✅ | `db.getRecentBlocks(lectureId:lid, beforeIndex:blockIndex, limit:10)` |
-| Known terms injected into search prompt | ✅ | `MemoryService.shared.getKnownTerms()` → `knownTermsBlock` in prompt |
-| Session-level caching | ✅ | `searchCache[ck]` in-memory dictionary |
-| Save creates SaveDraft after translation completes (bug fix) | ✅ | `handleSaveAction()` creates draft, async translation updates it |
-| Priority chain: ColdCall > Save > Search > empty | ✅ | `ContextualBottomQuadrant` — checks `coldCallPhase`, `activeCard`, then placeholder |
-
-**Changes needed:** None.
-
----
-
-### 5. Cold Call (Auto Answer Questions)
-
-| PRD Requirement | Status | Details |
-|----------------|--------|---------|
-| 7 regex patterns | ✅ | `ccPatterns` array with 7 patterns |
-| 90s cooldown | ✅ | `lastCC` checks `timeIntervalSince(last) < 90` |
-| 3-phase UI (detected / generating / answered) | ✅ | `ColdCallPhase` enum, `ColdCallCardView` switches on phase |
-| Phase 1 — "Question detected" + yellow badge | ✅ | Yellow badge via `Color(hex: "F59E0B")` |
-| Phase 2 — Generating + pulse animation | ✅ | Animated dots |
-| Phase 3 — Answered + green checkmark | ✅ | Green via `Color(hex: "15803D")` |
-| 45s auto-dismiss | ✅ | `startCCAutoDismiss()` with `45.0` second timer |
-| User can ✕ dismiss immediately | ✅ | `vm.dismissCC()` wired |
-| Context: last 15 blocks + slides + last 10 notes + Knowledge Profile | ✅ | `generateColdCallAnswer()` passes all four |
-| Answer feeds into Knowledge Profile | ✅ | `saveCCToNotes()` extracts terms and calls `MemoryService.shared.recordInteraction` |
-
-**Changes needed:** None.
-
----
-
-### 6. Keyboard Shortcuts
-
-| Shortcut | PRD | Code | Status |
-|----------|-----|------|--------|
-| `⌘N` — New Lecture | ✅ Listed | `keyboardShortcut("n", modifiers: [.command])` | ✅ |
-| `⌘⇧P` — Pause/Resume | ✅ Listed | `keyboardShortcut("p", modifiers: [.command, .shift])` | ✅ |
-| `⌘⇧K` — Save as Knowledge | ✅ Listed | `keyboardShortcut("k", modifiers: [.command, .shift])` | ✅ |
-| `⌘⇧L` — Save as Language | ✅ Listed | `keyboardShortcut("l", modifiers: [.command, .shift])` | ✅ |
-| `⌘⇧E` — Instant Search | ✅ Listed | `keyboardShortcut("e", modifiers: [.command, .shift])` | ✅ |
-| `⌘⇧X` — Export | ⚠️ Listed in PRD | `keyboardShortcut("x", modifiers: [.command, .shift])` | ✅ Exists. **FLAG:** Per user instruction, PRD mentions this. It IS implemented in code. |
-| `⌘⇧F` — Full transcript | 📋 Future | Method `toggleFullTranscript()` exists | 🔮 Not wired as shortcut |
-| `⌘⇧N` — Focus notes | 📋 Future | Method `focusNotesPanel()` exists | 🔮 Not wired as shortcut |
-| `⌘⇧A` — Focus auto-explain | 📋 Future | Method `focusAutoExplain()` exists | 🔮 Not wired as shortcut |
-| `⌘⇧C` — Cold call | 📋 Future | Method `handleColdCallShortcut()` exists | 🔮 Not wired as shortcut |
-| `Esc` — Dismiss popup/card | ✅ Implicit | `SelectionPopupView.onDismiss` + dismiss buttons on cards | ✅ |
-
-**Changes needed (future):** Wire `⌘⇧F`, `⌘⇧N`, `⌘⇧A`, `⌘⇧C` in `GraspApp.swift` `CommandMenu`.
-
----
-
-### 7. Timestamp (mm:ss) on Sealed Blocks
-
-| PRD Requirement | Status | Details |
-|----------------|--------|---------|
-| Each sealed block shows timestamp (mm:ss) left-aligned | ✅ | `timestampStr` computed from `createdAt`, shown in `BlockView` when `block.isSealed` |
-
-**Changes needed:** None.
-
----
-
-### 8. 45s Auto-Dismiss on Cold Call Answered
-
-| PRD Requirement | Status | Details |
-|----------------|--------|---------|
-| Answer persists for 45s, then auto-dismisses | ✅ | `startCCAutoDismiss()` fires `dismissCC()` after 45.0s |
-| User can ✕ dismiss immediately | ✅ | Button wired to `vm.dismissCC()` |
-
-**Changes needed:** None.
-
----
-
-### 9. Bug Fixes (PRD v1.1 Section)
-
-| Bug | Status | Code Evidence |
-|-----|--------|---------------|
-| Inter font not bundled | ✅ | `Inter.ttc` in Resources, `InterFont.swift` registers it |
-| Translation race in `handleSaveAction` | ✅ | `SaveDraft` created immediately, `activeCard` updated after translation completes |
-| `interimText` never populated | ✅ | `handleInterim()` sets `interimText = t` |
-| Transcription duplication | ✅ | No concatenation of `interimText` in `BlockView` |
-| Auto Explain polluting search history | ✅ | No `db.saveSearch` in `autoExplain()` |
-| Selection popup not appearing | ✅ | `NotificationCenter` observer replaces `NSEvent` monitor |
-| Selection popup flicker | ✅ | 80ms debounce |
-| Keyboard shortcuts wired up | ✅ | 5 shortcuts in `GraspApp.swift` |
-
----
-
-## Implementation Priority
-
-| Priority | Item | Effort | Impact |
-|----------|------|--------|--------|
-| P0 | None — all critical paths match PRD | — | — |
-| P1 | Wire ⌘⇧F, ⌘⇧N, ⌘⇧A, ⌘⇧C as keyboard shortcuts | Very Low | Developer UX |
-| P2 | Default `notesWidth` to 45% of window width | Low | First-use experience |
-| P3 | Auto Explain "Save to Notes" hover interaction | Low | UX polish |
-
----
-
-## Files Affected Per Change
-
-| Change | Files |
-|--------|-------|
-| TECH.md (this document) | `docs/v1.1/TECH.md` |
-| Wire future shortcuts | `GraspApp.swift` — CommandMenu additions |
-| Default notesWidth | `AppViewModel.swift` — change `@Published var notesWidth = 300.0` to dynamic init |
-
----
-
-## Build Status
-
-Current branch: `wt/fix-selection-popup`  
-Uncommitted changes: 4 files (Models.swift, AppViewModel.swift, NotesPanelView.swift, TranscriptPanelView.swift)
-
-These are the existing feature branch changes:
-- `LiveBlock.createdAt` field (for timestamp on sealed blocks)
-- Concept map 15s rolling window fix (`saveBlock` now sets `created_at`)
-- 2×2 grid layout
-- 80ms debounce on selection popup
-- NotificationCenter-based selection observer
-
-All PRD v1.1 features are accounted for. No gaps requiring implementation changes.
+- Rich text persistence could be enhanced with a dedicated RTF column
+- The `NSTextView` wrapper could be extracted to a reusable component
+- Horizontal divider drag could use visual feedback (accent highlight on hover)
+- Notes panel could benefit from keyboard navigation (Tab between notes)

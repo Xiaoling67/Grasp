@@ -17,18 +17,18 @@ struct KnowledgeProfileView: View {
             HStack {
                 Button(action: { dismiss() }) {
                     HStack(spacing: 4) {
-                        Text("<").font(.inter(size: 13, weight: .semibold)).foregroundColor(Color(hex: "1A5FD4"))
-                        Text("Back").font(.inter(size: 13)).foregroundColor(Color(hex: "1A5FD4"))
+                        Text("<").font(.inter(size: 13, weight: .semibold)).foregroundColor(Color.aiNewBorder)
+                        Text("Back").font(.inter(size: 13)).foregroundColor(Color.aiNewBorder)
                     }
                 }.buttonStyle(.plain)
                 Spacer()
-                Text("Knowledge Profile").font(.inter(size: 16, weight: .semibold)).foregroundColor(Color(hex: "0A0A0A"))
+                Text("Knowledge Profile").font(.inter(size: 16, weight: .semibold)).foregroundColor(Color.nearBlack)
                 Spacer()
-                Text("\(knownCount) known").font(.inter(size: 11)).foregroundColor(Color(hex: "C0C0C0"))
+                Text("\(knownCount) known").font(.inter(size: 11)).foregroundColor(Color.mutedGray)
             }
             .padding(EdgeInsets(top: 20, leading: 24, bottom: 12, trailing: 24))
 
-            Divider().foregroundColor(Color(hex: "E8E8E8"))
+            Divider().foregroundColor(Color.pillBorderGray)
 
             // Add concept row
             HStack(spacing: 8) {
@@ -37,7 +37,7 @@ struct KnowledgeProfileView: View {
                     .font(.inter(size: 13))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Color(hex: "F5F5F5"))
+                    .background(Color.hoverBg)
                     .cornerRadius(6)
                     .onSubmit { addConcept() }
 
@@ -46,7 +46,7 @@ struct KnowledgeProfileView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-                    .background(Color(hex: "1A5FD4"))
+                    .background(Color.aiNewBorder)
                     .cornerRadius(6)
                     .buttonStyle(.plain)
             }
@@ -86,11 +86,11 @@ struct KnowledgeProfileView: View {
                         VStack(spacing: 8) {
                             Text("No concepts yet")
                                 .font(.inter(size: 13))
-                                .foregroundColor(Color(hex: "C0C0C0"))
+                                .foregroundColor(Color.mutedGray)
                                 .padding(.top, 40)
                             Text("Concepts you search, save, or dismiss will appear here.")
                                 .font(.inter(size: 11))
-                                .foregroundColor(Color(hex: "D0D0D0"))
+                                .foregroundColor(Color.veryLightGray)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
                         }
@@ -177,7 +177,7 @@ private struct SectionHeader: View {
         HStack {
             Text("\u{2500}\u{2500} \(title) (\(count)) \u{2500}\u{2500}")
                 .font(.inter(size: 11, weight: .medium))
-                .foregroundColor(Color(hex: "C0C0C0"))
+                .foregroundColor(Color.mutedGray)
             Spacer()
         }
         .padding(EdgeInsets(top: 16, leading: 24, bottom: 6, trailing: 24))
@@ -194,7 +194,7 @@ private struct KnowledgeRecordRow: View {
             // Concept name
             Text(record.concept.prefix(1).uppercased() + record.concept.dropFirst())
                 .font(.inter(size: 13))
-                .foregroundColor(Color(hex: "0A0A0A"))
+                .foregroundColor(Color.nearBlack)
                 .lineLimit(1)
 
             Spacer()
@@ -212,10 +212,10 @@ private struct KnowledgeRecordRow: View {
             if record.status == .lookedUp || record.status == .preventive {
                 Text("\u{00D7}\(record.searchCount)")
                     .font(.inter(size: 10))
-                    .foregroundColor(Color(hex: "999999"))
+                    .foregroundColor(Color.searchCountGray)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 2)
-                    .background(Color(hex: "F0F0F0"))
+                    .background(Color.badgeBgGray)
                     .cornerRadius(4)
             }
 
@@ -223,7 +223,7 @@ private struct KnowledgeRecordRow: View {
             Button(action: onDelete) {
                 Text("\u{00D7}")
                     .font(.inter(size: 13, weight: .medium))
-                    .foregroundColor(Color(hex: "C0C0C0"))
+                    .foregroundColor(Color.mutedGray)
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
@@ -244,11 +244,11 @@ private struct KnowledgeRecordRow: View {
 
     private var statusColor: Color {
         switch record.status {
-        case .known:      return Color(hex: "34C759") // green
-        case .lookedUp:   return Color(hex: "007AFF") // blue
-        case .dismissed:  return Color(hex: "8E8E93") // grey
-        case .preventive: return Color(hex: "FF9500") // orange
-        case .neverSeen:  return Color(hex: "C0C0C0") // light grey
+        case .known:      return Color.statusGreen // green
+        case .lookedUp:   return Color.statusBlue // blue
+        case .dismissed:  return Color.statusGray // grey
+        case .preventive: return Color.statusOrange // orange
+        case .neverSeen:  return Color.mutedGray // light grey
         }
     }
 }

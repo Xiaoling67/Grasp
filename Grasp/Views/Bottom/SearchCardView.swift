@@ -13,32 +13,32 @@ struct SearchCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("SEARCH").font(.inter(size: 11, weight: .semibold)).foregroundColor(Color(hex: "5A5A5A"))
-                Spacer(); Button("✕") { dismiss() }.buttonStyle(.plain).font(.inter(size: 12)).foregroundColor(Color(hex: "C0C0C0"))
+                Text("SEARCH").font(.inter(size: 11, weight: .semibold)).foregroundColor(Color.mediumGray)
+                Spacer(); Button("✕") { dismiss() }.buttonStyle(.plain).font(.inter(size: 12)).foregroundColor(Color.mutedGray)
             }.padding(.horizontal, 12).padding(.vertical, 8)
-                .overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5), alignment: .bottom)
+                .overlay(Rectangle().fill(Color.pillBorderGray).frame(height: 0.5), alignment: .bottom)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
-                    if let e = result?.error { Text(e).font(.inter(size: 12)).foregroundColor(Color(hex: "B91C1C")) }
+                    if let e = result?.error { Text(e).font(.inter(size: 12)).foregroundColor(Color.accentRed) }
                     else {
-                        HStack(alignment: .top, spacing: 0) { Text(pro).font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A")).fixedSize(horizontal: false, vertical: true); if vm.searchStreaming { Text("▋").font(.inter(size: 13)).foregroundColor(Color(hex: "1A5FD4")) } }
-                        if !intu.isEmpty { Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5); Text(intu).font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A")).fixedSize(horizontal: false, vertical: true) }
+                        HStack(alignment: .top, spacing: 0) { Text(pro).font(.inter(size: 13)).foregroundColor(Color.nearBlack).fixedSize(horizontal: false, vertical: true); if vm.searchStreaming { Text("▋").font(.inter(size: 13)).foregroundColor(Color.aiNewBorder) } }
+                        if !intu.isEmpty { Rectangle().fill(Color.pillBorderGray).frame(height: 0.5); Text(intu).font(.inter(size: 13)).foregroundColor(Color.mediumGray).fixedSize(horizontal: false, vertical: true) }
                         if !vm.searchStreaming && result?.error == nil {
-                            Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5)
+                            Rectangle().fill(Color.pillBorderGray).frame(height: 0.5)
                             HStack(spacing: 6) {
-                                TextField("Ask a follow-up…", text: $followUp).textFieldStyle(.plain).font(.inter(size: 12)).padding(.horizontal, 8).padding(.vertical, 5).background(Color(hex: "F8F8F8")).cornerRadius(4).overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "E8E8E8"), lineWidth: 0.5)).onSubmit { send() }
-                                Button(action: send) { Text("→").font(.inter(size: 14)).foregroundColor(followUp.isEmpty ? Color(hex: "C0C0C0") : Color(hex: "1A5FD4")).padding(.horizontal, 8) }.buttonStyle(.plain).disabled(followUp.isEmpty)
+                                TextField("Ask a follow-up…", text: $followUp).textFieldStyle(.plain).font(.inter(size: 12)).padding(.horizontal, 8).padding(.vertical, 5).background(Color.fillTertiary).cornerRadius(4).overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.pillBorderGray, lineWidth: 0.5)).onSubmit { send() }
+                                Button(action: send) { Text("→").font(.inter(size: 14)).foregroundColor(followUp.isEmpty ? Color.mutedGray : Color.aiNewBorder).padding(.horizontal, 8) }.buttonStyle(.plain).disabled(followUp.isEmpty)
                             }
-                            TextField("Quick note…", text: $note, axis: .vertical).textFieldStyle(.plain).font(.inter(size: 12)).padding(8).background(Color(hex: "F8F8F8")).cornerRadius(4).overlay(RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "E8E8E8"), lineWidth: 0.5))
+                            TextField("Quick note…", text: $note, axis: .vertical).textFieldStyle(.plain).font(.inter(size: 12)).padding(8).background(Color.fillTertiary).cornerRadius(4).overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.pillBorderGray, lineWidth: 0.5))
                         }
                     }
                 }.padding(12)
             }
             if !vm.searchStreaming && result?.error == nil && !pro.isEmpty {
-                HStack { Spacer(); Button(action: saveToK) { Text(saved ? "Saved ✓" : "+ Save to Knowledge").font(.inter(size: 11, weight: .medium)) }.buttonStyle(.bordered).disabled(saved) }.padding(.horizontal, 12).padding(.vertical, 8).overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5), alignment: .top)
+                HStack { Spacer(); Button(action: saveToK) { Text(saved ? "Saved ✓" : "+ Save to Knowledge").font(.inter(size: 11, weight: .medium)) }.buttonStyle(.bordered).disabled(saved) }.padding(.horizontal, 12).padding(.vertical, 8).overlay(Rectangle().fill(Color.pillBorderGray).frame(height: 0.5), alignment: .top)
             }
-        }.background(Color.white).cornerRadius(8).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "E8E8E8"), lineWidth: 0.5)).shadow(color: .black.opacity(0.06), radius: 8, y: 1)
+        }.background(Color.white).cornerRadius(8).overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.pillBorderGray, lineWidth: 0.5)).shadow(color: .black.opacity(0.06), radius: 8, y: 1)
         .onAppear { if !vm.searchStreaming { startEngageTimer() } }
         .onChange(of: vm.searchStreaming) { streaming in if !streaming { startEngageTimer() } }
     }

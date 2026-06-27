@@ -31,7 +31,7 @@ struct HomeView: View {
             .frame(maxWidth: 420)
             .background(
                 LinearGradient(
-                    colors: [Color(hex: "1A5FD4"), Color(hex: "4A8BFA")],
+                    colors: [Color.aiNewBorder, Color.highlightBlue],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 )
             )

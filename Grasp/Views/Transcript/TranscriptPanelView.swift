@@ -35,13 +35,21 @@ struct TranscriptPanelView: View {
                     HStack(spacing: Spacing.sm) {
                         Text(String(last.textEn.prefix(80))).font(.inter(size: 11)).italic().foregroundColor(.textTertiary).lineLimit(1)
                         Spacer()
-                        Button("Resume") { vm.isScrollFrozen = false }.font(.inter(size: 11, weight: .medium)).foregroundColor(.accentBlue).padding(.horizontal, Spacing.xs).padding(.vertical, Spacing.xxs).background(Color.selectionBg).cornerRadius(CornerRadius.pill).overlay(RoundedRectangle(cornerRadius: CornerRadius.pill).stroke(Color(hex: "C5D8FC"), lineWidth: 1)).buttonStyle(.plain)
+                        Button("Resume") { vm.isScrollFrozen = false }.font(.inter(size: 11, weight: .medium)).foregroundColor(.accentBlue).padding(.horizontal, Spacing.xs).padding(.vertical, Spacing.xxs).background(Color.selectionBg).cornerRadius(CornerRadius.pill).overlay(RoundedRectangle(cornerRadius: CornerRadius.pill).stroke(Color.lightBlueBorder, lineWidth: 1)).buttonStyle(.plain)
                     }.padding(.horizontal, Spacing.md).padding(.vertical, Spacing.xxs).background(.regularMaterial)
                     .overlay(Rectangle().fill(Color.divider).frame(height: 1), alignment: .top)
                 }
                 if let p = popup {
+                    // Transparent overlay to dismiss popup on outside tap
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture { popup = nil }
+                        .allowsHitTesting(true)
+
                     SelectionPopupView(query: p.0, blockIndex: p.1, x: p.2, y: p.3, onDismiss: { popup = nil })
                         .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                        .focusable()
+                        .onKeyPress(.escape) { popup = nil; return .handled }
                 }
             }
             .background(Color.surfacePrimary)

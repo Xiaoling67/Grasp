@@ -14,23 +14,23 @@ struct AutoExplainCardView: View {
                 HStack(spacing: 6) {
                     Text("AUTO").font(.inter(size: 9, weight: .bold)).foregroundColor(.white)
                         .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Color(hex: "7C3AED")).cornerRadius(3)
-                    Text(term).font(.inter(size: 11, weight: .semibold)).foregroundColor(Color(hex: "5A5A5A"))
+                        .background(Color.accentPurple).cornerRadius(3)
+                    Text(term).font(.inter(size: 11, weight: .semibold)).foregroundColor(Color.mediumGray)
                 }
                 Spacer()
-                Button("✕") { vm.dismissAutoExplain() }.buttonStyle(.plain).font(.inter(size: 12)).foregroundColor(Color(hex: "C0C0C0"))
+                Button("✕") { vm.dismissAutoExplain() }.buttonStyle(.plain).font(.inter(size: 12)).foregroundColor(Color.mutedGray)
             }.padding(.horizontal, 12).padding(.vertical, 8)
-                .overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5), alignment: .bottom)
+                .overlay(Rectangle().fill(Color.pillBorderGray).frame(height: 0.5), alignment: .bottom)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .top, spacing: 0) {
-                        Text(pro).font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A")).fixedSize(horizontal: false, vertical: true)
-                        if vm.autoExplainStreaming { Text("▋").font(.inter(size: 13)).foregroundColor(Color(hex: "7C3AED")) }
+                        Text(pro).font(.inter(size: 13)).foregroundColor(Color.nearBlack).fixedSize(horizontal: false, vertical: true)
+                        if vm.autoExplainStreaming { Text("▋").font(.inter(size: 13)).foregroundColor(Color.accentPurple) }
                     }
                     if !intu.isEmpty {
-                        Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5)
-                        Text(intu).font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A")).fixedSize(horizontal: false, vertical: true)
+                        Rectangle().fill(Color.pillBorderGray).frame(height: 0.5)
+                        Text(intu).font(.inter(size: 13)).foregroundColor(Color.mediumGray).fixedSize(horizontal: false, vertical: true)
                     }
                 }.padding(12)
             }
@@ -41,11 +41,11 @@ struct AutoExplainCardView: View {
                     Button(action: saveToK) { Text(saved ? "Saved ✓" : "+ Save to Knowledge").font(.inter(size: 11, weight: .medium)) }
                         .buttonStyle(.bordered).disabled(saved)
                 }.padding(.horizontal, 12).padding(.vertical, 8)
-                    .overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 0.5), alignment: .top)
+                    .overlay(Rectangle().fill(Color.pillBorderGray).frame(height: 0.5), alignment: .top)
             }
         }
         .background(Color.white).cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color(hex: "EDE9FE"), lineWidth: 1))
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.lightPurpleBg, lineWidth: 1))
         .shadow(color: .black.opacity(0.06), radius: 8, y: 1)
     }
 

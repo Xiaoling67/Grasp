@@ -10,9 +10,9 @@ struct TopBarView: View {
             Button(action: { vm.sidebarVisible.toggle() }) { SidebarIcon().frame(width: 18, height: 18) }.buttonStyle(.plain)
             // + New Lecture pill — 12px/500/#5A5A5A, pill radius, 1px #E8E8E8
             Button(action: { vm.showNewLectureModal = true }) {
-                Text("+ New Lecture").font(.inter(size: 11)).foregroundColor(Color(hex: "5A5A5A"))
+                Text("+ New Lecture").font(.inter(size: 11)).foregroundColor(Color.mediumGray)
                     .padding(.horizontal, 8).padding(.vertical, 1).background(Color.white).cornerRadius(980)
-                    .overlay(RoundedRectangle(cornerRadius: 980).stroke(Color(hex: "E8E8E8"), lineWidth: 1))
+                    .overlay(RoundedRectangle(cornerRadius: 980).stroke(Color.pillBorderGray, lineWidth: 1))
             }.buttonStyle(.plain)
             // Tabs
             ScrollView(.horizontal, showsIndicators: false) {
@@ -23,16 +23,16 @@ struct TopBarView: View {
             if vm.isRecording {
                 HStack(spacing: 4) {
                     Button(action: { vm.togglePause() }) {
-                        Text(vm.isPaused ? "▶" : "⏸").font(.inter(size: 10)).foregroundColor(Color(hex: "5A5A5A")).frame(width: 18, height: 16)
-                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color(hex: "E8E8E8"), lineWidth: 1))
+                        Text(vm.isPaused ? "▶" : "⏸").font(.inter(size: 10)).foregroundColor(Color.mediumGray).frame(width: 18, height: 16)
+                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.pillBorderGray, lineWidth: 1))
                     Button(action: { Task { await vm.stopLecture() } }) {
-                        Text("■").font(.inter(size: 9)).foregroundColor(Color(hex: "B91C1C")).frame(width: 18, height: 16)
-                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color(hex: "DC3545").opacity(0.3), lineWidth: 1))
+                        Text("■").font(.inter(size: 9)).foregroundColor(Color.accentRed).frame(width: 18, height: 16)
+                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.stopBorderRed.opacity(0.3), lineWidth: 1))
                 }.padding(.trailing, 8)
             }
         }
         .frame(height: 18).background(Color.white)
-        .overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 1), alignment: .bottom)
+        .overlay(Rectangle().fill(Color.pillBorderGray).frame(height: 1), alignment: .bottom)
     }
 }
 
@@ -40,9 +40,9 @@ struct SidebarIcon: View {
     var body: some View {
         Canvas { ctx, size in
             let r = CGRect(x: 2, y: 2, width: 14, height: 14)
-            ctx.stroke(Path(roundedRect: r, cornerRadius: 2.5), with: .color(Color(hex: "9A9A9A")), lineWidth: 1.2)
+            ctx.stroke(Path(roundedRect: r, cornerRadius: 2.5), with: .color(Color.textTertiary), lineWidth: 1.2)
             let x = size.width * 5.5 / 16; var l = Path(); l.move(to: CGPoint(x: x, y: 2)); l.addLine(to: CGPoint(x: x, y: r.maxY))
-            ctx.stroke(l, with: .color(Color(hex: "9A9A9A")), lineWidth: 1.2)
+            ctx.stroke(l, with: .color(Color.textTertiary), lineWidth: 1.2)
         }.frame(width: 16, height: 16)
     }
 }
@@ -55,17 +55,17 @@ struct TabPill: View {
         HStack(spacing: 5) {
             if l && vm.isRecording && !vm.isPaused {
                 HStack(spacing: 1.5) { ForEach(0..<3, id: \.self) { i in
-                    RoundedRectangle(cornerRadius: 1).fill(Color(hex: "1A5FD4")).frame(width: 2, height: i==1 ? 8 : 4)
+                    RoundedRectangle(cornerRadius: 1).fill(Color.aiNewBorder).frame(width: 2, height: i==1 ? 8 : 4)
                 }}.frame(width: 10)
             }
             Text(tab.label).font(.inter(size: 12, weight: .light)).lineLimit(1)
             if !l || !vm.isRecording { Button(action: { vm.closeTab(id: tab.id) }) { Text("×").font(.inter(size: 11)) }.buttonStyle(.plain) }
         }
         .padding(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 8))
-        .background(a && l ? Color(hex: "E8F0FE") : a ? Color.white : Color.clear).cornerRadius(4)
-        .overlay(a && l ? RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "C5D8FC"), lineWidth: 1) : a ? RoundedRectangle(cornerRadius: 4).stroke(Color(hex: "E8E8E8"), lineWidth: 1) : nil)
+        .background(a && l ? Color.lightBlueBg : a ? Color.white : Color.clear).cornerRadius(4)
+        .overlay(a && l ? RoundedRectangle(cornerRadius: 4).stroke(Color.lightBlueBorder, lineWidth: 1) : a ? RoundedRectangle(cornerRadius: 4).stroke(Color.pillBorderGray, lineWidth: 1) : nil)
         .shadow(color: a && !l ? .black.opacity(0.05) : .clear, radius: 3, y: 1)
-        .foregroundColor(a && l ? Color(hex: "1A5FD4") : a ? Color(hex: "0A0A0A") : Color(hex: "9A9A9A"))
+        .foregroundColor(a && l ? Color.aiNewBorder : a ? Color.nearBlack : Color.textTertiary)
         .onTapGesture { vm.activeTabId = tab.id }
     }
 }
