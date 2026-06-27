@@ -349,6 +349,7 @@ struct NoteRow: View {
 struct ConceptNodeRow: View {
     let node: ConceptNode
     let depth: Int
+    @EnvironmentObject var vm: AppViewModel
 
     var bullet: String {
         switch node.level {
@@ -397,5 +398,10 @@ struct ConceptNodeRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
+        .contentShape(Rectangle())
+        .onTapGesture { vm.highlightBlocksForConcept(node) }
+        .contextMenu {
+            Button("Add to Knowledge Profile") { vm.addConceptToProfile(node) }
+        }
     }
 }

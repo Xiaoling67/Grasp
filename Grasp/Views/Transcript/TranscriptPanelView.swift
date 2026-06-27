@@ -91,9 +91,31 @@ struct TranscriptPanelView: View {
     }
 }
 
-// Spec 4.8: block — 13px EN / 12px ZH / active dot
+// Spec 4.8: block — 13px EN / 12px ZH / active dot / timestamp / highlight
 struct BlockView: View {
     @EnvironmentObject var vm: AppViewModel; let block: LiveBlock; let isActive: Bool
+
+    private var bgColor: Color {
+        if vm.highlightedBlockIds.contains(block.id) {
+            return Color(hex: "F0F5FF")  // light blue for concept-linked highlight
+        }
+        if isActive {
+            return Color(hex: "F5F5F5")  // grey background for active block
+        }
+        return Color.clear
+    }
+
+    private var timestampStr: String? {
+        guard let createdAt = block.createdAt, let lectureStart = vm.activeLectureId else { return nil }
+        // Compute mm:ss from first block's createdAt as reference
+        let firstBlockTs = vm.liveBlocks.first(where: { $0.createdAt != nil })?.createdAt ?? createdAt
+        let offsetMs = createdAt - firstBlockTs
+        let totalSeconds = max(0, Int(offsetMs / 1000))
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             if isActive {
@@ -102,9 +124,14 @@ struct BlockView: View {
                 Text(block.textEn).font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A")).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             }
             if let zh = block.textZh, !zh.isEmpty { Text(zh).font(.inter(size: 12)).foregroundColor(Color(hex: "5A5A5A")).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
+            if block.isSealed, let ts = timestampStr {
+                Text(ts).font(.inter(size: 9, weight: .medium)).foregroundColor(Color(hex: "C0C0C0")).padding(.top, 2)
+            }
             if isActive { HStack(spacing: 5) { Circle().fill(Color(hex: "1A5FD4")).frame(width: 6, height: 6); Text("Transcribing...").font(.inter(size: 10)).foregroundColor(Color(hex: "9A9A9A")) }.padding(.top, 2) }
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(bgColor)
+        .cornerRadius(4)
         .contextMenu {
             Button("Save as Knowledge (K)") { vm.handleSaveAction(type: "knowledge", text: block.textEn) }
             if vm.activeLectureMode == "international" { Button("Save as Language (L)") { vm.handleSaveAction(type: "language", text: block.textEn) } }

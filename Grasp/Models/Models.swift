@@ -49,7 +49,7 @@ struct ConceptNode: Identifiable, Codable {
 }
 
 // UI state
-struct LiveBlock: Identifiable { let id: String; var blockIndex: Int; var textEn: String; var textZh: String?; var isSealed: Bool }
+struct LiveBlock: Identifiable { let id: String; var blockIndex: Int; var textEn: String; var textZh: String?; var isSealed: Bool; var createdAt: Int64? }
 struct TabItem: Identifiable { var id: String; var type: TabType; var lectureId: String?; var label: String; enum TabType { case live, past } }
 enum AppPage { case home, settings, saved, searched }
 struct SaveDraft { var type: String; var original: String; var translation: String?; var lectureId: String? }

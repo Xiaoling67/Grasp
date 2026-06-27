@@ -14,6 +14,8 @@ import Foundation; import SwiftUI
     @Published var liveBlocks = [LiveBlock](); @Published var activeBlockId: String? = nil
     @Published var interimText = ""; @Published var isScrollFrozen = false
     @Published var selectedBlockId: String? = nil
+    @Published var showFullTranscript = false
+    @Published var highlightedBlockIds = Set<String>()
 
     // Notes (Spec 7.2: notesStore)
     @Published var noteBlocks = [NoteBlock](); @Published var slideStructure = [SlideItem]()
@@ -156,7 +158,7 @@ import Foundation; import SwiftUI
     }
 
     private func newBlock() {
-        let b = LiveBlock(id: UUID().uuidString, blockIndex: liveBlocks.count, textEn: "", isSealed: false)
+        let b = LiveBlock(id: UUID().uuidString, blockIndex: liveBlocks.count, textEn: "", isSealed: false, createdAt: Int64(Date().timeIntervalSince1970 * 1000))
         liveBlocks.append(b); activeBlockId = b.id
     }
 
@@ -259,6 +261,9 @@ import Foundation; import SwiftUI
         for s in ss where s.hasSuffix("?") && s.count < 150 { return s }
         return String((ss.last ?? t).prefix(120))
     }
+    func dismissCC() { coldCallPhase = nil; ccDismissTimer?.invalidate(); ccDismissTimer = nil }
+    private var ccDismissTimer: Timer?
+
     func generateCCAnswer(q: String) async {
         guard let lid = activeLectureId else { return }
         coldCallPhase = .generating
@@ -267,9 +272,16 @@ import Foundation; import SwiftUI
         let rn = Array(noteBlocks.suffix(10))
         if let a = await ds.generateColdCallAnswer(question: q, context: ctx, slides: sl, recentNotes: rn, subject: activeLectureSubject) {
             coldCallPhase = .answered(a)
+            startCCAutoDismiss()
         } else { coldCallPhase = nil }
     }
-    func dismissCC() { coldCallPhase = nil }
+
+    private func startCCAutoDismiss() {
+        ccDismissTimer?.invalidate()
+        ccDismissTimer = Timer.scheduledTimer(withTimeInterval: 45.0, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.dismissCC() }
+        }
+    }
 
     // MARK: - Auto Explain
     private func autoExplain(text: String, lectureId: String) async {
@@ -436,6 +448,56 @@ import Foundation; import SwiftUI
 
     /// Holds the most recent text selection from the transcript, for keyboard shortcuts.
     static var lastSelectedText: String = ""
+
+    // MARK: - Toggle & Focus (v1.1 keyboard shortcuts)
+
+    /// ⌘⇧F — Toggle full transcript view (hide/show translation columns)
+    func toggleFullTranscript() { showFullTranscript.toggle() }
+
+    /// ⌘⇧N — Focus notes panel (sets bottomTab to "current" to avoid hiding notes)
+    func focusNotesPanel() {
+        // Scroll notes view into focus — switching bottom tab off "auto" if needed
+        if bottomTab == "auto" { bottomTab = "current" }
+        showToast("Notes panel focused", type: "info")
+    }
+
+    /// ⌘⇧A — Focus auto-explain panel
+    func focusAutoExplain() {
+        bottomTab = "auto"
+        autoExplainNew = false
+    }
+
+    /// ⌘⇧C — Dismiss cold call
+    func handleColdCallShortcut() {
+        if coldCallPhase != nil { dismissCC() }
+    }
+
+    // MARK: - Concept Node → Block Highlighting
+
+    /// When a concept node is tapped, highlight transcript blocks that mention the concept.
+    func highlightBlocksForConcept(_ node: ConceptNode) {
+        let conceptWords = node.concept.lowercased().split(separator: " ").filter { $0.count > 2 }
+        guard !conceptWords.isEmpty else { return }
+
+        let matchingBlockIds = liveBlocks.filter { block in
+            let text = block.textEn.lowercased()
+            return conceptWords.contains(where: { text.contains($0) })
+        }.map(\.id)
+
+        highlightedBlockIds = Set(matchingBlockIds)
+
+        // Auto-clear highlight after 3 seconds
+        Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            highlightedBlockIds = []
+        }
+    }
+
+    /// Right-click concept node → add to Knowledge Profile
+    func addConceptToProfile(_ node: ConceptNode) {
+        MemoryService.shared.recordInteraction(concept: node.concept, action: .markKnown)
+        showToast("Added \"\(node.concept)\" to Knowledge Profile", type: "info")
+    }
 
     // Debug
     @Published var deepgramStatus = ""; @Published var transcriptsReceived = 0
