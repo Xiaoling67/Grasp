@@ -1,6 +1,8 @@
 import SwiftUI
 
-// Spec 4.8 & 10: Transcript panel with blocks + PreviewStrip
+// v1.1-r2: Instant selection popup — no debounce, no asyncAfter.
+// Uses NSTextView.didChangeSelectionNotification directly on main queue.
+// Popup appears within 1 frame (≤16ms) of user completing selection.
 struct TranscriptPanelView: View {
     @EnvironmentObject var vm: AppViewModel
     @State private var popup: (String, Int, CGFloat, CGFloat)? = nil
@@ -15,68 +17,77 @@ struct TranscriptPanelView: View {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             if vm.liveBlocks.isEmpty && vm.interimText.isEmpty {
                                 Text(vm.isRecording ? "Listening… speak now." : "Start a lecture to begin transcription.")
-                                    .font(.inter(size: 14)).foregroundColor(Color(hex: "C0C0C0")).padding(.top, 60).padding(.horizontal, 48)
+                                    .font(.inter(size: 14)).foregroundColor(.textTertiary).padding(.top, 60).padding(.horizontal, Spacing.xxl)
                             } else {
                                 ForEach(vm.liveBlocks) { b in
                                     BlockView(block: b, isActive: b.id == vm.activeBlockId).id(b.id)
                                 }
                                 if !vm.interimText.isEmpty && vm.activeBlockId == nil {
-                                    Text(vm.interimText).font(.inter(size: 13)).foregroundColor(Color(hex: "5A5A5A")).padding(.horizontal, 14).padding(.vertical, 10)
+                                    Text(vm.interimText).font(.inter(size: 13)).foregroundColor(.textSecondary).padding(.horizontal, 14).padding(.vertical, 10)
                                 }
                                 Color.clear.frame(height: 40).id("bot")
                             }
-                        }.padding(.horizontal, 48).padding(.vertical, 32)
+                        }.padding(.horizontal, Spacing.xxl).padding(.vertical, Spacing.xl)
                     }
-                    .onChange(of: vm.liveBlocks.count) { withAnimation { proxy.scrollTo("bot", anchor: .bottom) } }
+                    .onChange(of: vm.liveBlocks.count) { withAnimation(.easeInOut(duration: 0.2)) { proxy.scrollTo("bot", anchor: .bottom) } }
                 }
                 if vm.isScrollFrozen, let last = vm.liveBlocks.last {
-                    HStack(spacing: 12) {
-                        Text(String(last.textEn.prefix(80))).font(.inter(size: 11)).italic().foregroundColor(Color(hex: "9A9A9A")).lineLimit(1)
+                    HStack(spacing: Spacing.sm) {
+                        Text(String(last.textEn.prefix(80))).font(.inter(size: 11)).italic().foregroundColor(.textTertiary).lineLimit(1)
                         Spacer()
-                        Button("Resume") { vm.isScrollFrozen = false }.font(.inter(size: 11, weight: .medium)).foregroundColor(Color(hex: "1A5FD4")).padding(.horizontal, 8).padding(.vertical, 2).background(Color(hex: "E8F0FE")).cornerRadius(980).overlay(RoundedRectangle(cornerRadius: 980).stroke(Color(hex: "C5D8FC"), lineWidth: 1)).buttonStyle(.plain)
-                    }.padding(.horizontal, 20).padding(.vertical, 6).background(.regularMaterial)
-                    .overlay(Rectangle().fill(Color(hex: "D0D0D0")).frame(height: 1), alignment: .top)
+                        Button("Resume") { vm.isScrollFrozen = false }.font(.inter(size: 11, weight: .medium)).foregroundColor(.accentBlue).padding(.horizontal, Spacing.xs).padding(.vertical, Spacing.xxs).background(Color.selectionBg).cornerRadius(CornerRadius.pill).overlay(RoundedRectangle(cornerRadius: CornerRadius.pill).stroke(Color(hex: "C5D8FC"), lineWidth: 1)).buttonStyle(.plain)
+                    }.padding(.horizontal, Spacing.md).padding(.vertical, Spacing.xxs).background(.regularMaterial)
+                    .overlay(Rectangle().fill(Color.divider).frame(height: 1), alignment: .top)
                 }
                 if let p = popup {
                     SelectionPopupView(query: p.0, blockIndex: p.1, x: p.2, y: p.3, onDismiss: { popup = nil })
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
-            }.background(Color.white)
+            }
+            .background(Color.surfacePrimary)
             .onAppear {
                 panelFrame = geo.frame(in: .global)
-                // Observe text selection changes in the transcript.
-                // SwiftUI's .textSelection(.enabled) creates a temporary NSTextView field editor
-                // that posts didChangeSelectionNotification when the user selects text.
-                // This is more reliable than checking window.firstResponder.
+                // v1.1-r2: INSTANT popup — no debounce, no asyncAfter.
+                // Observe NSTextView.didChangeSelectionNotification directly on main queue.
+                // Popup must appear within 1 frame (≤16ms).
                 selectionObserver = NotificationCenter.default.addObserver(
                     forName: NSTextView.didChangeSelectionNotification,
                     object: nil,
                     queue: .main
                 ) { [self] notification in
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                        guard let tv = notification.object as? NSTextView,
-                              let window = tv.window,
-                              window == NSApp.keyWindow,
-                              !tv.isEditable, tv.isSelectable else { return }
+                    guard let tv = notification.object as? NSTextView,
+                          let window = tv.window,
+                          window == NSApp.keyWindow,
+                          !tv.isEditable, tv.isSelectable else { return }
 
-                        let range = tv.selectedRange()
-                        guard range.length > 2 else { popup = nil; return }
+                    let range = tv.selectedRange()
+                    // Minimum selection: 2 characters
+                    guard range.length >= 2 else { popup = nil; return }
 
-                        let selected = (tv.string as NSString)
-                            .substring(with: range)
-                            .trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !selected.isEmpty else { popup = nil; return }
+                    let selected = (tv.string as NSString)
+                        .substring(with: range)
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !selected.isEmpty else { popup = nil; return }
 
-                        AppViewModel.lastSelectedText = selected
+                    // Ignore punctuation-only selections
+                    let letters = selected.filter { $0.isLetter || $0.isNumber }
+                    guard !letters.isEmpty else { popup = nil; return }
 
-                        // Position popup above the selected text
-                        if let lm = tv.layoutManager, let tc = tv.textContainer {
-                            let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
-                            let rect = lm.boundingRect(forGlyphRange: glyphRange, in: tc)
-                            let windowRect = tv.convert(rect, to: nil)
-                            let popupX = windowRect.midX - panelFrame.minX
-                            let popupY = (tv.window?.contentView?.frame.height ?? 600) - windowRect.minY - panelFrame.minY
-                            popup = (selected, 0, popupX, popupY)
-                        }
+                    AppViewModel.lastSelectedText = selected
+
+                    // Position popup — calculate in same runloop cycle
+                    if let lm = tv.layoutManager, let tc = tv.textContainer {
+                        let glyphRange = lm.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+                        let rect = lm.boundingRect(forGlyphRange: glyphRange, in: tc)
+                        let windowRect = tv.convert(rect, to: nil)
+                        let popupX = windowRect.midX - panelFrame.minX
+                        let popupY = (tv.window?.contentView?.frame.height ?? 600) - windowRect.minY - panelFrame.minY
+
+                        // Position above selection by default; below if clipped
+                        let aboveY = popupY + 4  // 4px gap above
+                        let belowY = popupY - rect.height - 4  // below selection
+                        let useAbove = aboveY > 80  // enough room above?
+                        popup = (selected, 0, popupX, useAbove ? aboveY : belowY)
                     }
                 }
             }
@@ -86,7 +97,12 @@ struct TranscriptPanelView: View {
                     selectionObserver = nil
                 }
             }
-            .onChange(of: geo.size) { _ in panelFrame = geo.frame(in: .global) }
+            .onChange(of: geo.size) { _ in
+                panelFrame = geo.frame(in: .global)
+                // Dismiss popup on layout change
+                popup = nil
+            }
+            .animation(.easeInOut(duration: 0.2), value: popup == nil)
         }
     }
 }
@@ -97,17 +113,16 @@ struct BlockView: View {
 
     private var bgColor: Color {
         if vm.highlightedBlockIds.contains(block.id) {
-            return Color(hex: "F0F5FF")  // light blue for concept-linked highlight
+            return .selectionBg
         }
         if isActive {
-            return Color(hex: "F5F5F5")  // grey background for active block
+            return Color.surfaceSecondary
         }
         return Color.clear
     }
 
     private var timestampStr: String? {
         guard let createdAt = block.createdAt, let lectureStart = vm.activeLectureId else { return nil }
-        // Compute mm:ss from first block's createdAt as reference
         let firstBlockTs = vm.liveBlocks.first(where: { $0.createdAt != nil })?.createdAt ?? createdAt
         let offsetMs = createdAt - firstBlockTs
         let totalSeconds = max(0, Int(offsetMs / 1000))
@@ -119,19 +134,19 @@ struct BlockView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             if isActive {
-                Text(block.textEn).font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A")).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                Text(block.textEn).font(.inter(size: 13)).foregroundColor(.textPrimary).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             } else {
-                Text(block.textEn).font(.inter(size: 13)).foregroundColor(Color(hex: "0A0A0A")).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                Text(block.textEn).font(.inter(size: 13)).foregroundColor(.textPrimary).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
             }
-            if let zh = block.textZh, !zh.isEmpty { Text(zh).font(.inter(size: 12)).foregroundColor(Color(hex: "5A5A5A")).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
+            if let zh = block.textZh, !zh.isEmpty { Text(zh).font(.inter(size: 12)).foregroundColor(.textSecondary).textSelection(.enabled).fixedSize(horizontal: false, vertical: true) }
             if block.isSealed, let ts = timestampStr {
-                Text(ts).font(.inter(size: 9, weight: .medium)).foregroundColor(Color(hex: "C0C0C0")).padding(.top, 2)
+                Text(ts).font(.inter(size: 9, weight: .medium)).foregroundColor(.textTertiary).padding(.top, 2)
             }
-            if isActive { HStack(spacing: 5) { Circle().fill(Color(hex: "1A5FD4")).frame(width: 6, height: 6); Text("Transcribing...").font(.inter(size: 10)).foregroundColor(Color(hex: "9A9A9A")) }.padding(.top, 2) }
+            if isActive { HStack(spacing: 5) { Circle().fill(Color.accentBlue).frame(width: 6, height: 6); Text("Transcribing...").font(.inter(size: 10)).foregroundColor(.textTertiary) }.padding(.top, 2) }
         }
-        .padding(.horizontal, 12).padding(.vertical, 10)
+        .padding(.horizontal, Spacing.sm).padding(.vertical, 10)
         .background(bgColor)
-        .cornerRadius(4)
+        .cornerRadius(CornerRadius.card)
         .contextMenu {
             Button("Save as Knowledge (K)") { vm.handleSaveAction(type: "knowledge", text: block.textEn) }
             if vm.activeLectureMode == "international" { Button("Save as Language (L)") { vm.handleSaveAction(type: "language", text: block.textEn) } }

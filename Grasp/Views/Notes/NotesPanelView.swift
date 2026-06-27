@@ -1,56 +1,51 @@
 import SwiftUI
+import AppKit
 
+// v1.1-r2: Apple Notes-style flat rich-text editor
+// No tree, no bullets, no indentation, no concept map.
 struct NotesPanelView: View {
     @EnvironmentObject var vm: AppViewModel
-    // Single source of truth for which note is being edited
     @State private var editingId: String? = nil
-    @State private var editText = ""
+    @State private var newNoteIds = Set<String>()  // for blue-border animation
 
     var body: some View {
         VStack(spacing: 0) {
             header
 
-            if vm.conceptMap.isEmpty {
-                // v1.0 backward compat: render flat noteBlocks
-                if vm.noteBlocks.isEmpty && vm.slideStructure.isEmpty {
-                    emptyState
-                } else {
+            if vm.noteBlocks.isEmpty {
+                emptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
-                            if vm.slideStructure.isEmpty {
-                                ForEach(vm.noteBlocks) { n in rowFor(n) }
-                            } else {
-                                ForEach(vm.slideStructure, id: \.index) { slide in
-                                    slideSection(slide)
-                                }
+                            ForEach(vm.noteBlocks) { note in
+                                NoteRichEditor(
+                                    note: note,
+                                    isEditing: editingId == note.id,
+                                    isNew: newNoteIds.contains(note.id),
+                                    onBeginEdit: { beginEdit(note) },
+                                    onCreateNewAfter: { commitAndCreateBelow(note) },
+                                    onSave: { content in saveNote(note, content) },
+                                    onDeleteEmpty: { deleteNote(note) }
+                                )
+                                .id(note.id)
+                                .transition(.opacity.combined(with: .offset(y: 5)))
                             }
-                            Color.clear.frame(height: 80)
+                            Color.clear.frame(height: 80).id("notes-bot")
                         }
                     }
-                }
-            } else {
-                // v1.1: render Concept Map tree
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        if vm.slideStructure.isEmpty {
-                            // No slide grouping — flat tree
-                            let tree = buildConceptTree(from: vm.conceptMap)
-                            ForEach(tree) { node in
-                                conceptNodeView(node, depth: 0)
-                            }
-                        } else {
-                            // Grouped by slide
-                            ForEach(vm.slideStructure, id: \.index) { slide in
-                                conceptSlideSection(slide)
+                    .onChange(of: vm.noteBlocks.count) { count in
+                        if count > 0, let last = vm.noteBlocks.last {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                proxy.scrollTo(last.id, anchor: .bottom)
                             }
                         }
-                        Color.clear.frame(height: 80)
                     }
                 }
             }
         }
-        .background(Color.white)
-        // Save when tapping outside any note (clicking the scroll area)
+        .background(Color.surfacePrimary)
         .contentShape(Rectangle())
         .onTapGesture { commitEdit() }
     }
@@ -59,153 +54,39 @@ struct NotesPanelView: View {
 
     var header: some View {
         HStack {
-            Text("NOTES").font(.inter(size: 11, weight: .semibold)).foregroundColor(Color(hex: "5A5A5A"))
+            Text("AI NOTES")
+                .font(.inter(size: AppTypography.caption, weight: .semibold))
+                .foregroundColor(.textSecondary)
+                .tracking(0.5)
             Spacer()
-            if vm.conceptMap.isEmpty {
-                Text("\(vm.noteBlocks.count)").font(.inter(size: 10)).foregroundColor(Color(hex: "C0C0C0"))
-            } else {
-                Text("\(vm.conceptMap.count)").font(.inter(size: 10)).foregroundColor(Color(hex: "C0C0C0"))
-            }
+            Text("\(vm.noteBlocks.count)")
+                .font(.inter(size: AppTypography.small))
+                .foregroundColor(.textTertiary)
             Button(action: addNote) {
-                Image(systemName: "plus").font(.system(size: 12)).foregroundColor(Color(hex: "5A5A5A"))
-            }.buttonStyle(.plain)
+                Image(systemName: "plus")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.textSecondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("New note (⌘N)")
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(Color(hex: "F8F8F8"))
-        .overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 1), alignment: .bottom)
+        .padding(.horizontal, Spacing.md).padding(.vertical, Spacing.xs)
+        .background(Color.surfaceSecondary)
+        .overlay(Rectangle().fill(Color.divider).frame(height: 1), alignment: .bottom)
     }
 
     var emptyState: some View {
-        Text("AI notes will appear here…")
-            .font(.inter(size: 12)).foregroundColor(Color(hex: "C0C0C0"))
-            .frame(maxWidth: .infinity, maxHeight: .infinity).padding(.top, 20)
-    }
-
-    // MARK: - Slide section (flat notes, v1.0 compat)
-
-    func slideSection(_ slide: SlideItem) -> some View {
-        let notes = vm.noteBlocks.filter { $0.slideIndex == slide.index }
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Text(slide.title.uppercased())
-                    .font(.inter(size: 10, weight: .semibold))
-                    .foregroundColor(Color(hex: "C0C0C0"))
-                    .tracking(0.3)
-                Spacer()
-                Button(action: { addNoteToSlide(slide) }) {
-                    Image(systemName: "plus").font(.system(size: 10)).foregroundColor(Color(hex: "CCCCCC"))
-                }.buttonStyle(.plain)
-            }
-            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
-
-            if notes.isEmpty {
-                Text("Waiting for lecture…")
-                    .font(.inter(size: 12)).foregroundColor(Color(hex: "E0E0E0"))
-                    .padding(.horizontal, 18).padding(.vertical, 4)
-            } else {
-                ForEach(notes) { n in rowFor(n) }
-            }
-        }
-    }
-
-    // MARK: - Note row factory (flat notes)
-
-    func rowFor(_ note: NoteBlock) -> some View {
-        NoteRow(
-            note: note,
-            isEditing: editingId == note.id,
-            editText: editingId == note.id ? $editText : .constant(note.content),
-            onBeginEdit: { beginEdit(note) },
-            onCommit: { commitEdit(); addNoteBelow(note) },
-            onBlur: { commitEdit() },
-            onDelete: { vm.deleteNote(id: note.id); if editingId == note.id { editingId = nil } },
-            onIndent: { vm.updateNote(id: note.id, content: note.content, level: max(0, min(2, note.level + 1))) }
-        )
-    }
-
-    // MARK: - Concept Map tree (v1.1)
-
-    func buildConceptTree(from nodes: [ConceptNode]) -> [ConceptNode] {
-        let dict = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
-        // Build child relationships
-        var roots: [ConceptNode] = []
-        for node in nodes {
-            if node.parentId == nil {
-                var root = node
-                root.children = collectChildren(of: node.id, from: dict)
-                roots.append(root)
-            }
-        }
-        return roots
-    }
-
-    private func collectChildren(of parentId: String, from dict: [String: ConceptNode]) -> [ConceptNode] {
-        var children: [ConceptNode] = []
-        for (_, node) in dict {
-            if node.parentId == parentId {
-                var child = node
-                child.children = collectChildren(of: node.id, from: dict)
-                children.append(child)
-            }
-        }
-        // Sort by slideIndex then level for deterministic order
-        children.sort { a, b in
-            if a.slideIndex != b.slideIndex { return a.slideIndex < b.slideIndex }
-            return a.level < b.level
-        }
-        return children
-    }
-
-    func flattenNode(_ node: ConceptNode) -> [ConceptNode] {
-        var result = [node]
-        if let children = node.children {
-            for child in children {
-                result.append(contentsOf: flattenNode(child))
-            }
-        }
-        return result
-    }
-
-    @ViewBuilder
-    func conceptNodeView(_ node: ConceptNode, depth: Int) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ConceptNodeRow(node: node, depth: depth)
-
-            // Recursively render children
-            if let children = node.children, !children.isEmpty {
-                ForEach(children) { child in
-                    AnyView(conceptNodeView(child, depth: depth + 1))
-                }
-            }
-        }
-    }
-
-    func conceptSlideSection(_ slide: SlideItem) -> some View {
-        let tree = buildConceptTree(from: vm.conceptMap)
-        let slideNodes = tree
-            .filter { $0.slideIndex == slide.index }
-            .flatMap { flattenNode($0) }
-
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6) {
-                Text(slide.title.uppercased())
-                    .font(.inter(size: 10, weight: .semibold))
-                    .foregroundColor(Color(hex: "C0C0C0"))
-                    .tracking(0.3)
-                Spacer()
-            }
-            .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 4)
-
-            if slideNodes.isEmpty {
-                Text("Waiting for lecture…")
-                    .font(.inter(size: 12)).foregroundColor(Color(hex: "E0E0E0"))
-                    .padding(.horizontal, 18).padding(.vertical, 4)
-            } else {
-                let slideRoots = tree.filter { $0.slideIndex == slide.index }
-                ForEach(slideRoots) { root in
-                    conceptNodeView(root, depth: 0)
-                }
-            }
+        VStack(spacing: Spacing.sm) {
+            Spacer()
+            Image(systemName: "note.text")
+                .font(.system(size: 32))
+                .foregroundColor(.textTertiary)
+            Text("AI notes will appear here…")
+                .font(.inter(size: AppTypography.caption))
+                .foregroundColor(.textTertiary)
+            Spacer()
         }
     }
 
@@ -215,24 +96,31 @@ struct NotesPanelView: View {
         if editingId == note.id { return }
         commitEdit()
         editingId = note.id
-        editText = note.content
+        newNoteIds.remove(note.id)
     }
 
     func commitEdit() {
-        guard let id = editingId else { return }
-        let trimmed = editText.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty {
-            // Delete empty notes created by user but not filled in
-            if let n = vm.noteBlocks.first(where: { $0.id == id }), n.source == "user" {
-                vm.deleteNote(id: id)
-            }
-        } else {
-            vm.updateNote(id: id, content: trimmed, level: nil)
-            if let i = vm.noteBlocks.firstIndex(where: { $0.id == id }) {
-                vm.noteBlocks[i].content = trimmed
-            }
-        }
         editingId = nil
+    }
+
+    func commitAndCreateBelow(_ note: NoteBlock) {
+        commitEdit()
+        addNoteBelow(note)
+    }
+
+    func deleteNote(_ note: NoteBlock) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            vm.deleteNote(id: note.id)
+        }
+        if editingId == note.id { editingId = nil }
+        newNoteIds.remove(note.id)
+    }
+
+    func saveNote(_ note: NoteBlock, _ content: String) {
+        vm.updateNote(id: note.id, content: content, level: nil)
+        if let idx = vm.noteBlocks.firstIndex(where: { $0.id == note.id }) {
+            vm.noteBlocks[idx].content = content
+        }
     }
 
     // MARK: - Add helpers
@@ -242,166 +130,272 @@ struct NotesPanelView: View {
         commitEdit()
         let slideIdx = vm.slideStructure.last?.index ?? vm.noteBlocks.last?.slideIndex ?? 0
         let slideTitle = vm.slideStructure.last?.title ?? vm.noteBlocks.last?.slideTitle
-        let n = DatabaseService.shared.saveNoteBlock(lectureId: lid, slideIndex: slideIdx, slideTitle: slideTitle, content: "", source: "user", level: 1)
+        let n = vm.saveNoteBlockToDb(lectureId: lid, slideIndex: slideIdx, slideTitle: slideTitle, content: "", source: "user")
         vm.noteBlocks.append(n)
-        editingId = n.id; editText = ""
-    }
-
-    func addNoteToSlide(_ slide: SlideItem) {
-        guard let lid = vm.activeLectureId else { return }
-        commitEdit()
-        let n = DatabaseService.shared.saveNoteBlock(lectureId: lid, slideIndex: slide.index, slideTitle: slide.title, content: "", source: "user", level: 1)
-        vm.noteBlocks.append(n)
-        editingId = n.id; editText = ""
+        editingId = n.id
     }
 
     func addNoteBelow(_ note: NoteBlock) {
-        guard let lid = vm.activeLectureId else { return }
-        let n = DatabaseService.shared.saveNoteBlock(lectureId: lid, slideIndex: note.slideIndex, slideTitle: note.slideTitle, content: "", source: "user", level: note.level)
+        guard let lid = vm.activeLectureId else {
+            // If no active lecture, still allow adding a note
+            let n = vm.saveNoteBlockToDb(lectureId: "local", slideIndex: 0, slideTitle: nil, content: "", source: "user")
+            if let idx = vm.noteBlocks.firstIndex(where: { $0.id == note.id }) {
+                vm.noteBlocks.insert(n, at: idx + 1)
+            } else {
+                vm.noteBlocks.append(n)
+            }
+            editingId = n.id
+            return
+        }
+        let n = vm.saveNoteBlockToDb(lectureId: lid, slideIndex: note.slideIndex, slideTitle: note.slideTitle, content: "", source: "user")
         if let idx = vm.noteBlocks.firstIndex(where: { $0.id == note.id }) {
             vm.noteBlocks.insert(n, at: idx + 1)
-        } else { vm.noteBlocks.append(n) }
-        editingId = n.id; editText = ""
+        } else {
+            vm.noteBlocks.append(n)
+        }
+        editingId = n.id
     }
 }
 
-// MARK: - NoteRow (flat notes, v1.0 compat)
+// MARK: - NoteRichEditor — NSTextView-based editable note
 
-struct NoteRow: View {
+struct NoteRichEditor: View {
     let note: NoteBlock
     let isEditing: Bool
-    @Binding var editText: String
+    let isNew: Bool
     let onBeginEdit: () -> Void
-    let onCommit: () -> Void     // Enter key → save + new note below
-    let onBlur: () -> Void       // focus lost → save
-    let onDelete: () -> Void
-    let onIndent: () -> Void
+    let onCreateNewAfter: () -> Void
+    let onSave: (String) -> Void
+    let onDeleteEmpty: () -> Void
 
     @State private var hovered = false
-    @FocusState private var focused: Bool
-
-    var bullet: String { note.level == 0 ? "▸" : note.level == 1 ? "•" : "◦" }
-    var indent: CGFloat { CGFloat(note.level) * 14 }
-    var bulletColor: Color { Color(hex: note.level == 0 ? "9A9A9A" : "CCCCCC") }
+    @State private var showBlueBorder = false
+    @State private var editingContent: String = ""
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            // Indent spacer
-            Spacer().frame(width: 14 + indent)
+            // Blue left border for new AI notes
+            Rectangle()
+                .fill(isNew && showBlueBorder ? Color.aiNewBorder : Color.clear)
+                .frame(width: 3)
+                .padding(.trailing, Spacing.xxs)
 
-            // Bullet
-            Text(bullet)
-                .font(.inter(size: note.level == 0 ? 11 : 13))
-                .foregroundColor(bulletColor)
-                .frame(width: 14)
-                .padding(.top, 3)
-
-            // Content — TextField always present when editing, Text otherwise
-            if isEditing {
-                TextField("", text: $editText)
-                    .textFieldStyle(.plain)
-                    .font(.inter(size: 13))
-                    .foregroundColor(Color(hex: "0A0A0A"))
-                    .focused($focused)
-                    .onAppear { focused = true }
-                    .onSubmit { onCommit() }
-                    .onChange(of: focused) { _, f in if !f { onBlur() } }
-                    .padding(.vertical, 3)
-                    .frame(maxWidth: .infinity)
-            } else {
-                Text(note.content.isEmpty ? "Click to edit…" : note.content)
-                    .font(.inter(size: 13))
-                    .foregroundColor(note.content.isEmpty ? Color(hex: "DDDDDD") : Color(hex: "0A0A0A"))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 3)
-                    .contentShape(Rectangle())
-                    .onTapGesture { onBeginEdit() }
+            // Content area
+            VStack(alignment: .leading, spacing: 0) {
+                if isEditing {
+                    NSTextFieldRepresentable(
+                        text: $editingContent,
+                        noteId: note.id,
+                        isNew: note.content.isEmpty,
+                        onBlur: {
+                            // Save content on blur
+                            let trimmed = editingContent.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if trimmed.isEmpty && note.source == "user" {
+                                onDeleteEmpty()
+                            } else {
+                                onSave(editingContent)
+                            }
+                        },
+                        onEnter: {
+                            // Enter key pressed: save current, create new below
+                            onSave(editingContent)
+                            onCreateNewAfter()
+                        },
+                        onDeleteEmpty: {
+                            onDeleteEmpty()
+                        }
+                    )
+                    .frame(minHeight: 20)
+                } else {
+                    // Display mode
+                    if note.content.isEmpty {
+                        Text("Click to edit…")
+                            .font(.inter(size: AppTypography.body))
+                            .foregroundColor(.textTertiary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, Spacing.xxs)
+                    } else {
+                        AttributedTextDisplay(html: note.content)
+                            .padding(.vertical, Spacing.xxs)
+                    }
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Right side decorations
-            HStack(spacing: 4) {
-                if note.source == "ai" && !isEditing {
-                    Text("AI")
-                        .font(.inter(size: 8, weight: .bold)).foregroundColor(Color(hex: "1A5FD4"))
-                        .padding(.horizontal, 3).padding(.vertical, 1)
-                        .background(Color(hex: "E8F0FE")).cornerRadius(3)
+            // Delete button on hover
+            if hovered && !isEditing {
+                Button(action: onDeleteEmpty) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(.textTertiary)
                 }
-                if hovered && !isEditing {
-                    Button(action: onDelete) {
-                        Image(systemName: "xmark").font(.system(size: 9)).foregroundColor(Color(hex: "AAAAAA"))
-                    }.buttonStyle(.plain)
-                }
-            }.frame(minWidth: 20)
+                .buttonStyle(.plain)
+                .padding(.leading, Spacing.xxs)
+                .padding(.top, Spacing.xxs)
+            }
         }
-        .padding(.horizontal, 8).padding(.vertical, 2)
-        .background(isEditing ? Color(hex: "EEF3FF").opacity(0.5) : hovered ? Color(hex: "F8F8F8") : Color.clear)
-        .cornerRadius(4)
-        .onHover { hovered = $0 }
-        .contextMenu {
-            Button("Delete", action: onDelete)
-            Button(note.level < 2 ? "Indent →" : "Outdent ←", action: onIndent)
+        .padding(.horizontal, Spacing.md)
+        .padding(.vertical, Spacing.xs)
+        .background(isEditing ? Color.selectionBg.opacity(0.3) : hovered ? Color.hoverBg.opacity(0.5) : Color.clear)
+        .contentShape(Rectangle())
+        .onTapGesture { if !isEditing { onBeginEdit() } }
+        .onHover { h in
+            withAnimation(.easeInOut(duration: 0.15)) {
+                hovered = h
+            }
+        }
+        .onAppear {
+            if isNew {
+                showBlueBorder = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                    withAnimation(.easeInOut(duration: 1.0)) {
+                        showBlueBorder = false
+                    }
+                }
+            }
+        }
+        .onChange(of: isEditing) { _, editing in
+            if editing {
+                editingContent = note.content
+            }
         }
     }
 }
 
-// MARK: - ConceptNodeRow (v1.1)
+// MARK: - NSTextFieldRepresentable — wraps NSTextView for rich text editing
 
-struct ConceptNodeRow: View {
-    let node: ConceptNode
-    let depth: Int
-    @EnvironmentObject var vm: AppViewModel
+struct NSTextFieldRepresentable: NSViewRepresentable {
+    @Binding var text: String
+    let noteId: String
+    let isNew: Bool
+    let onBlur: () -> Void
+    let onEnter: () -> Void
+    let onDeleteEmpty: () -> Void
 
-    var bullet: String {
-        switch node.level {
-        case 0: return "▸"
-        case 1: return "•"
-        case 2: return "◦"
-        default: return "•"
+    func makeNSView(context: Context) -> NSTextView {
+        let tv = NSTextView()
+        tv.isEditable = true
+        tv.isSelectable = true
+        tv.isRichText = true
+        tv.font = NSFont(name: "Inter", size: 13)
+        tv.textColor = .controlTextColor
+        tv.drawsBackground = false
+        tv.isVerticallyResizable = true
+        tv.isHorizontallyResizable = false
+        tv.autoresizingMask = [.width]
+        tv.textContainer?.widthTracksTextView = true
+        tv.textContainer?.lineFragmentPadding = 0
+        tv.allowsUndo = true
+
+        // Set initial text content
+        if !text.isEmpty {
+            if let data = text.data(using: .utf8),
+               let attrStr = try? NSAttributedString(data: data,
+                    options: [.documentType: NSAttributedString.DocumentType.html],
+                    documentAttributes: nil) {
+                tv.textStorage?.setAttributedString(attrStr)
+            } else {
+                tv.string = text
+            }
         }
+
+        tv.delegate = context.coordinator
+        context.coordinator.textView = tv
+        context.coordinator.onBlur = onBlur
+        context.coordinator.onEnter = onEnter
+        context.coordinator.onDeleteEmpty = onDeleteEmpty
+        context.coordinator.textBinding = $text
+
+        tv.allowsImageEditing = false
+        tv.isAutomaticQuoteSubstitutionEnabled = false
+        tv.isAutomaticDashSubstitutionEnabled = false
+        tv.isAutomaticTextReplacementEnabled = false
+        tv.isAutomaticSpellingCorrectionEnabled = false
+        tv.isContinuousSpellCheckingEnabled = false
+
+        // Focus
+        DispatchQueue.main.async {
+            tv.window?.makeFirstResponder(tv)
+        }
+
+        return tv
     }
 
-    var bulletColor: Color {
-        switch node.level {
-        case 0: return Color(hex: "1A5FD4")        // blue for core theses
-        case 1: return Color(hex: "9A9A9A")        // gray for key points
-        case 2: return Color(hex: "CCCCCC")        // light gray for details
-        default: return Color(hex: "CCCCCC")
+    func updateNSView(_ nsView: NSTextView, context: Context) {
+        // On creation, content is already set
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject, NSTextViewDelegate {
+        weak var textView: NSTextView?
+        var onBlur: (() -> Void)?
+        var onEnter: (() -> Void)?
+        var onDeleteEmpty: (() -> Void)?
+        var textBinding: Binding<String>?
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                // Check for Shift+Return
+                if let event = NSApp.currentEvent, event.modifierFlags.contains(.shift) {
+                    return false  // line break
+                }
+                // Enter key — create new note below
+                onEnter?()
+                return true
+            }
+            if commandSelector == #selector(NSResponder.deleteBackward(_:)) {
+                if textView.string.isEmpty {
+                    onDeleteEmpty?()
+                    return true
+                }
+            }
+            return false
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            // Capture the text content as HTML
+            guard let tv = textView else { return }
+            if let attrStr = tv.textStorage, attrStr.length > 0 {
+                let range = NSRange(location: 0, length: attrStr.length)
+                if let htmlData = try? attrStr.data(from: range,
+                    documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
+                    let html = String(data: htmlData, encoding: .utf8) ?? tv.string
+                    textBinding?.wrappedValue = html
+                } else {
+                    textBinding?.wrappedValue = tv.string
+                }
+            } else {
+                textBinding?.wrappedValue = tv.string
+            }
+            onBlur?()
         }
     }
+}
+
+// MARK: - HTML Attributed String Display
+
+struct AttributedTextDisplay: View {
+    let html: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 4) {
-            // Depth indent
-            Spacer().frame(width: CGFloat(depth) * 18)
-
-            // Bullet
-            Text(bullet)
-                .font(.inter(size: depth == 0 ? 11 : 13))
-                .foregroundColor(bulletColor)
-                .frame(width: 14)
-                .padding(.top, 3)
-
-            // Content
-            VStack(alignment: .leading, spacing: 1) {
-                Text(node.concept)
-                    .font(.inter(size: 13, weight: depth <= 1 ? .semibold : .regular))
-                    .foregroundColor(Color(hex: "0A0A0A"))
-
-                Text(node.content)
-                    .font(.inter(size: 11))
-                    .foregroundColor(Color(hex: "7A7A7A"))
-                    .lineLimit(3)
-            }
-            .padding(.vertical, 3)
-
-            Spacer()
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .contentShape(Rectangle())
-        .onTapGesture { vm.highlightBlocksForConcept(node) }
-        .contextMenu {
-            Button("Add to Knowledge Profile") { vm.addConceptToProfile(node) }
+        if let data = html.data(using: .utf8),
+           let attrStr = try? NSAttributedString(data: data,
+                options: [.documentType: NSAttributedString.DocumentType.html],
+                documentAttributes: nil) {
+            Text(AttributedString(attrStr))
+                .font(.inter(size: AppTypography.body))
+                .foregroundColor(.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text(html)
+                .font(.inter(size: AppTypography.body))
+                .foregroundColor(.textPrimary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

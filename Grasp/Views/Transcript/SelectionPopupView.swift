@@ -1,27 +1,73 @@
 import SwiftUI
+import AppKit
 
-// Spec 4.9 & 25: Glassmorphism popup K/L/Search/Notes
+// v1.1-r2: Instant pill-shaped popup with NSVisualEffectView material
 struct SelectionPopupView: View {
     @EnvironmentObject var vm: AppViewModel; let query: String; let blockIndex: Int; let x: CGFloat; let y: CGFloat; let onDismiss: () -> Void
 
     var body: some View {
         HStack(spacing: 2) {
-            Button(vm.activeLectureMode == "international" ? "K" : "Save") { vm.handleSaveAction(type: "knowledge", text: query); onDismiss() }.popupBtn()
-            if vm.activeLectureMode == "international" { popupDivider; Button("L") { vm.handleSaveAction(type: "language", text: query); onDismiss() }.popupBtn() }
-            popupDivider; Button("Search") { vm.triggerSearch(query: query, blockIndex: blockIndex); onDismiss() }.popupBtn(color: Color(hex: "1A5FD4"))
-            popupDivider; Button("Notes") { vm.handleCopyToNotes(text: query); onDismiss() }.popupBtn(color: Color(hex: "15803D"))
+            Button(action: { vm.handleSaveAction(type: "knowledge", text: query); onDismiss() }) {
+                Label("K", systemImage: "bookmark.fill")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 12))
+            }
+            .popupBtn()
+
+            popupDivider
+
+            if vm.activeLectureMode == "international" {
+                Button(action: { vm.handleSaveAction(type: "language", text: query); onDismiss() }) {
+                    Label("L", systemImage: "character.bubble.fill")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 12))
+                }
+                .popupBtn()
+                popupDivider
+            }
+
+            Button(action: { vm.triggerSearch(query: query, blockIndex: blockIndex); onDismiss() }) {
+                Label("Search", systemImage: "magnifyingglass")
+                    .font(.system(size: 12))
+            }
+            .popupBtn(color: .accentBlue)
         }
-        .padding(.vertical, 4).padding(.horizontal, 5)
-        .background(RoundedRectangle(cornerRadius: 15).fill(Color.white))
-        .overlay(RoundedRectangle(cornerRadius: 15).stroke(Color(hex: "E0E0E0"), lineWidth: 1))
-        .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
-        .position(x: min(max(x - 60, 70), 700), y: max(y - 44, 8))
+        .padding(.vertical, Spacing.xxs).padding(.horizontal, Spacing.xs)
+        .background(
+            VisualEffectView(material: .popover, blendingMode: .behindWindow)
+                .clipShape(RoundedRectangle(cornerRadius: CornerRadius.popup))
+                .shadow(color: .black.opacity(0.1), radius: 8, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.popup)
+                .stroke(Color.divider, lineWidth: 1)
+        )
+        .position(x: min(max(x, 100), 750), y: max(y - 44, 8))
     }
-    var popupDivider: some View { Rectangle().fill(Color(hex: "E8E8E8")).frame(width: 1, height: 16).padding(.horizontal, 2) }
+
+    var popupDivider: some View {
+        Rectangle().fill(Color.divider).frame(width: 1, height: 16).padding(.horizontal, 2)
+    }
+}
+
+// NSVisualEffectView wrapper
+struct VisualEffectView: NSViewRepresentable {
+    let material: NSVisualEffectView.Material
+    let blendingMode: NSVisualEffectView.BlendingMode
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let v = NSVisualEffectView()
+        v.material = material
+        v.blendingMode = blendingMode
+        v.state = .active
+        return v
+    }
+
+    func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
 }
 
 extension View {
-    func popupBtn(color: Color = Color(hex: "0A0A0A")) -> some View {
-        self.buttonStyle(.plain).font(.inter(size: 12, weight: .medium)).foregroundColor(color).padding(.horizontal, 10).frame(height: 24)
+    func popupBtn(color: Color = Color.textPrimary) -> some View {
+        self.buttonStyle(.plain).foregroundColor(color).padding(.horizontal, 8).frame(height: 24)
     }
 }

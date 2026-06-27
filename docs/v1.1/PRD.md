@@ -1,9 +1,9 @@
-# Grasp — PRD v1.1
+# Grasp — PRD v1.1 (Founder's Revision)
 
-**Version:** 1.1
+**Version:** 1.1-r2
 **Date:** 2026-06-27
 **Platform:** macOS 14.0+ | Swift 5.9 | SwiftUI + AppKit
-**Status:** In development
+**Status:** In development — rewrite to match Founder requirements
 **Window:** Single-window app, default 1280×800, minimum 960×640
 
 ---
@@ -24,160 +24,326 @@ Grasp is a next-generation AI note-taking assistant for live lectures and meetin
 
 ---
 
-## Change Log (v1.0 → v1.1)
+## Change Log (v1.0 → v1.1-r2)
 
-| Area | v1.0 (shipped) | v1.1 (this PRD) |
-|------|----------------|-----------------|
-| **Layout** | Side-by-side (transcript \| notes) with bottom panel tabs | 2×2 grid layout — 4 quadrants (65/35 vertical, 55/45 horizontal). Bottom panel unchanged. |
-| **AI Notes** | Flat per-seal notes, ≤25 words, level 0/1/2 | **Concept Map** — 15s rolling window, hierarchical concept tree with parent/child, rendered as indented outline. Dual render path: old lectures show flat notes. |
-| **Auto Explain** | Stateless per block — no student memory | **Student Knowledge Profile** (SQLite) personalizes depth: known→skip, lookedUp→1-line reminder, neverSeen→full explanation. Results stay in bottom-left quadrant. |
-| **Search & Save** | Selection popup. Search returns definition \| analogy. Save types: K/L. Caching: in-memory per session only. | Selection popup fixed (NotificationCenter). Search prompt injects known terms from profile. Saved terms auto-add to Knowledge Profile. |
-| **Transcription** | Word-by-word display. Semantic blocking (50–100 words) via Deepgram UtteranceEnd. | Same + **PDF slide parsing** at lecture start anchors context. Optional **Qwen-MT translation** in International mode. |
-| **Cold Call** | 7 regex patterns, 90s cooldown, 3-phase UI. Context: last 15 blocks + slides + last 10 notes. | Same + answers feed into Knowledge Profile. |
-| **Keyboard shortcuts** | Documented in README but only `⌘N` wired up | All shortcuts implemented: `⌘⇧P`, `⌘⇧K`, `⌘⇧L`, `⌘⇧E`, `⌘⇧X`, plus `⌘N` |
-| **Bug fixes** | None (shipped with known bugs) | 7 bugs fixed (see table below) |
-| **Layout interactivity** | Static | Resizable vertical divider between columns; fixed 65/35 horizontal divider |
-
----
-
-## 1. Transcription (with optional translation)
-
-**Purpose:** Real-time capture of lecture audio into readable text blocks, with optional live translation for International mode.
-
-**UI Placement:** Top-left quadrant of the 2×2 grid.
-
-**UI Component:** `TranscriptPanelView` — fills entire top-left quadrant.
-
-**Exact behavior:**
-- **Engine:** Deepgram Nova-3 via WebSocket streaming.
-- **Semantic blocking (Sealing):** Blocks seal on Deepgram `UtteranceEnd` event (~2s silence). Lower limit: 50 words. Upper limit: 100 words. Interim results update the active (unsealed) block in real time.
-- **PDF slide parsing:** At lecture start, uploaded PDF's text content is parsed and injected as context into note/cold-call/explain prompts. Slides parsed once; parsed text cached for session duration.
-- **Translation (International mode only):** Per sealed block, dispatches async Qwen-MT Flash translation (fallback: DeepSeek). Translations displayed inline alongside original text.
-- **States:**
-  - *Idle:* Empty area with placeholder "Waiting for transcription…"
-  - *Streaming:* Words appear character-by-character in active (unsealed) block, grey background highlight on active block.
-  - *Sealed:* Block moves to sealed list, background turns white. Each sealed block shows timestamp (mm:ss) left-aligned.
-
-**Keyboard shortcuts:**
-- `⌘⇧P` — Pause/Resume transcription
-- `⌘⇧F` — Toggle full transcript view (hide/show translation columns)
+| Area | v1.0 (shipped) | v1.1-r1 (failed — shipped to Founder) | v1.1-r2 (THIS — Founder's requirements) |
+|------|----------------|----------------------------------------|------------------------------------------|
+| **Layout** | Side-by-side (transcript \| notes) with bottom panel tabs | 2×2 grid layout (65/35 vertical, 55/45 horizontal). Horizontal divider **fixed**. | 2×2 grid layout. **ALL dividers draggable** — vertical AND horizontal. User freely resizes all 4 quadrants. |
+| **Selection popup** | Broken (NSEvent) | Fixed via NotificationCenter with **80ms debounce**. Slow, unresponsive. | **Instant** popup. No debounce. Direct synchronous tracking. Appears immediately on selection. |
+| **AI Notes** | Flat per-seal notes, ≤25 words, level 0/1/2 | **Concept Map** — hierarchical tree with indented bullets, parent/child/depth indentation. **Founder hates it.** | **Apple Notes clone** — smooth scrolling, inline editing, rich text. No tree. No indented bullets. No custom hierarchy. |
+| **Dividers** | Static | Vertical resizable; horizontal fixed 65/35 | **ALL dividers movable** — vertical AND horizontal. 4 freely resizable quadrants. |
+| **UI quality** | Prototype | Prototype with hardcoded hex colors | **Beautiful, polished** — design system, proper spacing, animations, native feel. |
+| Auto Explain | Stateless per block | Student Knowledge Profile (SQLite) | Unchanged from v1.1-r1 |
+| Search & Save | Selection popup broken | Selection popup fixed (but slow) | Selection popup **instant** |
+| Transcription | Word-by-word display, semantic blocking | Same + PDF slide parsing | Unchanged from v1.1-r1 |
+| Cold Call | 7 regex patterns, 90s cooldown, 3-phase UI | Same + answers feed into Knowledge Profile | Unchanged from v1.1-r1 |
+| Keyboard shortcuts | Only ⌘N wired up | All shortcuts implemented | Unchanged from v1.1-r1 |
+| Bug fixes | None (shipped with known bugs) | 7 bugs fixed | All v1.1-r1 fixes kept |
+| Layout interactivity | Static | Resizable vertical divider only; fixed 65/35 horizontal | **Full 2×2 resize:** both dividers draggable |
 
 ---
 
-## 2. AI Notes (Concept Map)
+## 1. Selection Popup — MUST BE INSTANT
 
-**Purpose:** Generate a structured, hierarchical concept map from the lecture in real time. Replaces v1.0's flat per-seal notes.
+**Founder's exact words:**
+> "在 transcription 那个地方划词的时候，它出现的特别慢，而且划词非常不灵敏，出现就是我划完词以后，然后它那个对话框弹出的也特别慢"
 
-**UI Placement:** Top-right quadrant of the 2×2 grid.
+**Translation:** When selecting text in the transcript, the popup appears very slowly. Text selection is unresponsive. After finishing the selection, the dialog box appears with significant delay.
 
-**UI Component:** `NotesPanelView` — fills entire top-right quadrant.
+### Root Cause of Failure (v1.1-r1)
+The previous implementation used `NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification)` with `DispatchQueue.main.asyncAfter(deadline: .now() + 0.08)`. The 80ms debounce plus the NotificationCenter dispatch adds ~100-150ms latency. This makes the popup feel sluggish and disconnected from the user's selection gesture.
 
-**Exact behavior:**
-- **Trigger:** Every 15 seconds of rolling window (not per seal event). Consolidates last N sealed blocks.
-- **Engine:** DeepSeek returns a hierarchical concept tree with parent/child/sibling relationships.
-- **Rendering:** Indented outline format. Depth indicated by indentation level (1 em per level). Each node shows concept name (bold) + 1-line summary beneath.
-- **Dual render path:**
-  - *New lectures:* Concept map outline.
-  - *Old lectures (v1.0 data):* Flat notes as bullet list — no hierarchy, no indentation.
-- **Interactions:** Click on any concept node → highlights corresponding transcript blocks. Right-click → "Add to Knowledge Profile."
-- **Manual note editing:** User can add, edit, or delete individual note entries. Edits are persisted to SQLite and marked as `manual` (not overwritten by future auto-generation of that concept).
+### Exact Behavior (v1.1-r2)
 
-**Keyboard shortcuts:**
-- `⌘N` — New lecture (creates new tab, starts transcription)
-- `⌘⇧N` — Focus notes panel
+**1. Instant popup on selection:**
+- **No debounce.** Zero artificial delay.
+- Use `NSTextView.didChangeSelectionNotification` directly on the main queue — no `asyncAfter`.
+- Popup position calculated in the **same runloop cycle** as the selection change.
+- Popup must appear within **1 frame** (≤16ms) of the user completing selection.
 
----
+**2. Selection sensitivity:**
+- Minimum selection length: **2 characters** (not 3 as in v1.1-r1).
+- Empty/whitespace-only selections are ignored.
+- Selection of punctuation-only or whitespace-only is ignored.
 
-## 3. Auto Explain
+**3. Popup positioning:**
+- Popup appears **above** the selected text, centered horizontally.
+- If above placement would clip the window top, popup appears **below** the selection.
+- Popup follows window scroll — repositions on scroll events.
+- Small vertical gap (4px) between selected text and popup.
 
-**Purpose:** Automatically detect and explain unfamiliar concepts as they appear in the lecture, personalized to the student's knowledge level.
+**4. Popup content:**
+- Three buttons in a pill-shaped toolbar:
+  - **Search** (AI definition + analogy)
+  - **Save as Knowledge (K)** — saves to SQLite, adds to Knowledge Profile
+  - **Save as Language (L)** — only visible in International mode
+- Buttons use SF Symbols + short labels.
+- Background: `NSVisualEffectView` material (vibrant light) with rounded corners (10px).
+- Pill shape: compact, floats above content, no blocking of surrounding text.
 
-**UI Placement:** Bottom-left quadrant of the 2×2 grid — **always visible, never removed from view hierarchy.**
+**5. Dismissal:**
+- Tap outside popup → dismiss immediately.
+- Press `Esc` → dismiss immediately.
+- Start typing → dismiss immediately.
+- Scrolling transcript → dismiss immediately.
+- Selecting different text → dismiss old popup, show new popup for new selection.
 
-**UI Component:** `AutoExplainBottomQuadrant` wrapper + `AutoExplainCardView` inside.
-
-**Exact behavior:**
-- **Trigger:** Per sealed block — one check per block.
-- **Detection:** DeepSeek identifies exactly one unfamiliar term per block (confidence ≥ 0.65).
-- **Student Knowledge Profile (SQLite):**
-  - `known` (student already knows this) → skip, no output.
-  - `lookedUp` (student has seen it before) → show 1-line reminder.
-  - `neverSeen` → full explanation: definition + intuition/analogy (streamed).
-- **States (bottom-left quadrant):**
-  - *Idle:* Shows placeholder text: "Watching for unfamiliar terms…" in grey (`#C0C0C0`). Purple dot indicator (`#7C3AED`, 5px circle) absent.
-  - *Loading:* Purple dot appears next to "AUTO EXPLAIN" header. Card area shows spinner.
-  - *Streaming:* `AutoExplainCardView` visible — streaming explanation token-by-token.
-  - *Complete:* Full explanation shown. Purple dot solid. User can hover → "Save to Notes" button appears.
-- **Persistence:** Results stay in bottom-left quadrant, **never auto-enter notes.** User clicks "Save to Notes" manually to persist. Saved explanations respect Knowledge Profile (lookedUp status set).
-- **Header:** "AUTO EXPLAIN" label (11pt semibold, `#5A5A5A`). Purple dot right-aligned when new content available.
-
-**Keyboard shortcuts:**
-- `⌘⇧A` — Focus auto-explain panel / jump to latest explanation
-
----
-
-## 4. Search and Save
-
-**Purpose:** Allow users to select any text and immediately search (AI definition + analogy) or save it (Knowledge or Language entry).
-
-**UI Placement:** Bottom-right quadrant of the 2×2 grid (contextual — shows one view at a time via priority chain).
-
-**UI Components:** `ContextualBottomQuadrant` wrapper, `SearchCardView`, `SaveCardView`, `ColdCallCardView`.
-
-**Exact behavior:**
-- **Trigger:** User selects any text (word/phrase/sentence) in the transcript or notes → selection popup appears.
-- **Selection popup:** Fixed via `NotificationCenter` (replaces broken `NSEvent` monitor). 80ms debounce prevents flicker. Three buttons: **Search**, **Save as Knowledge (K)**, **Save as Language (L)** (L only visible in International mode).
-- **Search action:**
-  - DeepSeek returns exactly 1 definition + 1 intuition/analogy, separated by `|` delimiter.
-  - Context: last 10 sealed blocks + known terms from Knowledge Profile (injected into prompt).
-  - Streamed token-by-token in `SearchCardView`.
-  - Cached per session (in-memory).
-- **Save action:**
-  - Save as Knowledge (K): saves to SQLite, auto-adds term to Knowledge Profile as `lookedUp`.
-  - Save as Language (L): saves with async translation. Bug fixed: `SaveDraft` created after translation completes (not synchronously).
-  - User can add optional short note per save.
-- **Priority chain (bottom-right quadrant):**
-  1. (highest) Cold call active → `ColdCallCardView`
-  2. Save action → `SaveCardView`
-  3. Search action → `SearchCardView`
-  4. (empty) → Placeholder: "COLD CALL / SAVE / SEARCH — Activity appears here"
-- **Transitions:**
-  - *Cold call arrives while Save visible:* Cold call replaces Save. Save not lost — stored in `vm.activeCard`, reappears on cold call dismiss.
-  - *User initiates Search while Cold Call visible:* Cold call stays. Search accessible via bottom panel "Searched" tab.
-  - *Both Save and Search active:* Save wins. Search results in `vm.sessionSearches` + bottom panel.
-
-**Keyboard shortcuts:**
-- `⌘⇧K` — Save selected text as Knowledge
-- `⌘⇧L` — Save selected text as Language (International mode only)
-- `⌘⇧E` — Trigger Instant Search on selected text
-- `Esc` — Dismiss selection popup / current card
+### Acceptance Criteria
+- [ ] Popup appears instantly (≤1 frame) after text selection.
+- [ ] No artificial delay, debounce, or `asyncAfter` in the selection-to-popup path.
+- [ ] Minimum 2-character selection triggers popup.
+- [ ] Popup correctly positions above selection (or below if clipped).
+- [ ] Popup dismisses on outside tap, Esc, new selection, or scroll.
+- [ ] Popup uses `NSVisualEffectView` material (vibrant).
+- [ ] Popup buttons (Search / K / L) work correctly.
 
 ---
 
-## 5. Auto Answer Questions (Cold Call)
+## 2. AI Notes Panel — EXACT CLONE OF APPLE NOTES
 
-**Purpose:** Detect when a professor asks a question and generate a context-grounded answer in real time.
+**Founder's exact words:**
+> "我右面那个就是 AI 笔记的智能生成，它也没有给我按照我是说的是要必须是像 MacBook，就是苹果公司出的那款原生自带的那款 note 笔记一样那样顺滑，然后完全要做成那一模一样的东西，你现在一条一条非常的不灵敏"
 
-**UI Placement:** Bottom-right quadrant of the 2×2 grid — **highest priority** view.
+**Translation:** The AI Notes panel on the right does not match what I asked for. I said it MUST be exactly like Apple's native Notes app on Mac — smooth, exactly the same. Right now it's a clunky item-by-item list that is unresponsive.
 
-**UI Component:** `ColdCallCardView` (phase: detected | generating | answered).
+### Why v1.1-r1 Failed
+The previous implementation used a **hierarchical concept tree** (`ConceptNode`, `buildConceptTree`, `ConceptNodeRow`) with:
+- Indented bullets (▸, •, ◦) at different levels
+- Depth-based indentation (18px per level)
+- Parent/child/sibling tree rendering
+- Distinct bullet colors per level (blue/gray/light gray)
 
-**Exact behavior:**
-- **Detection:** 7 regex patterns (who knows, can anyone, does anyone, anybody, tell me, somebody, who here). Cooldown: 90s.
-- **Answer generation:** DeepSeek using context from last 15 sealed blocks + uploaded slides + last 10 note entries + Knowledge Profile.
-- **3-phase UI:**
-  - *Phase 1 — Detected:* "Question detected" banner with speaker icon. Yellow badge. "Answering…" text. Duration: until first token arrives (~1–3s).
-  - *Phase 2 — Generating:* Streaming answer token-by-token. Purple badge. "Generating…" pulse animation on speaker icon.
-  - *Phase 3 — Answered:* Complete answer displayed in card. Green checkmark badge. Answer persists for 45s, then auto-dismisses. User can ✕ dismiss immediately.
-- **Auto-dismiss:** 45s after answered state. On dismiss, falls through priority chain to save/search/empty.
-- **Knowledge Profile integration:** Terms in the generated answer are checked against the profile. If the answer contains a `neverSeen` term, it triggers an Auto Explain automatically (bottom-left quadrant).
+This is **WRONG**. The Founder explicitly wants Apple Notes behavior, not an indented outline.
 
-**Keyboard shortcuts:**
-- `⌘⇧C` — Show/hide cold call card (if active)
+### Exact Behavior (v1.1-r2)
+
+The Notes panel must behave **IDENTICALLY** to Apple's native Notes app on macOS:
+
+**1. Visual layout:**
+- Plain white background, no tree, no indentation.
+- No bullet characters (▸, •, ◦) — notes are plain rich-text blocks.
+- No concept hierarchy rendering — all notes displayed as a flat, scrollable list of rich text entries.
+- Header area with "AI NOTES" label (same style as Apple Notes' title area).
+- Smooth scrolling with rubber-banding at edges (native NSScrollView behavior).
+
+**2. Inline editing EXACTLY like Apple Notes:**
+- **Click to edit** — tap anywhere on a note's text content to enter edit mode.
+- Edit in place — no separate text field, no modal, no sheet. The text itself becomes editable.
+- **Rich text support** — bold, italic, underline, strikethrough (via keyboard shortcuts ⌘B, ⌘I, ⌘U).
+- **NSTextView-based** editing, not SwiftUI TextField. Use AppKit's NSTextView for native text editing behavior.
+- **Auto-save on blur** — edits committed when focus leaves the note.
+- **Return/Enter** — creates a new note below (like Notes app creates a new line within the note, but for Grasp: Enter should create a new note entry within the current note block).
+- **Shift+Return** — line break within the same note.
+- **Delete empty note** — if a note becomes empty on blur, remove it (like Notes app removes empty entries).
+
+**3. AI-generated notes appear as editable rich text blocks:**
+- Each AI note is a rich text block in the flat list.
+- AI notes are pre-populated with content, fully editable.
+- When AI generates a new note, it slides in with a smooth animation (opacity + slight vertical offset).
+- New notes are distinguished by a subtle blue left border (2px, `#1A5FD4`) on the left edge — this fades after 5 seconds.
+- After edit, the note is marked as `manual` and the blue border is removed.
+
+**4. User-created notes:**
+- Click the "+" button in the header (or press ⌘N) to create a new blank note.
+- New note appears with cursor blinking, ready for typing.
+- No blue border (user notes are never shown as "new").
+
+**5. Scrolling behavior:**
+- Native NSScrollView with smooth scrolling.
+- Velocity-based deceleration.
+- Rubber-banding at content edges.
+- Auto-scroll to bottom when a new AI note arrives (unless user has scrolled up manually).
+
+**6. Note deletion:**
+- Hover over a note → subtle "×" button appears in the top-right corner of the note frame.
+- Click "×" → note is deleted with a fade-out animation.
+- **Backspace on empty note** — if the user empties a note and presses backspace (or blurs), the note is deleted.
+
+**7. Rich text persistence:**
+- Notes are saved as **HTML** or **RTF** in SQLite (not plain text), preserving rich text formatting.
+- On reload, rich text is restored exactly as edited.
+
+**8. Legacy data compatibility (v1.0 flat notes):**
+- Old v1.0 notes are rendered as plain rich text blocks (no hierarchy).
+- The concept map data model is **deleted** — no `ConceptNode`, no `conceptMap`, no tree structures.
+- All notes become a flat array of editable rich text blocks.
+
+### What to DELETE from codebase
+- `ConceptNode` struct (data model)
+- `ConceptNodeRow` view
+- `buildConceptTree()` method
+- `flattenNode()` method
+- `collectChildren()` method
+- `conceptNodeView()` method
+- `conceptSlideSection()` method
+- `buildConceptTree` call in `NotesPanelView`
+- All level/indent/bullet logic in `NoteRow`
+- `ConceptMap` related properties in `AppViewModel`
+- Any code that renders hierarchical indentation
+
+### What to BUILD
+- Flat rich text editor using `NSTextView` wrapped in `NSViewRepresentable`
+- Apple Notes-style visual layout (no bullets, no indentation)
+- Inline editing with click-to-edit
+- Rich text toolbar or keyboard shortcuts (⌘B, ⌘I, ⌘U)
+- Smooth animations for add/remove notes
+- Proper focus management between notes
+
+### Acceptance Criteria
+- [ ] Notes panel looks EXACTLY like Apple Notes — flat, white, no bullets, no indent.
+- [ ] Click any note text → instantly editable in place.
+- [ ] Rich text support: ⌘B bold, ⌘I italic, ⌘U underline work inside notes.
+- [ ] Enter creates new note below within the note block.
+- [ ] Shift+Enter creates line break within the same note.
+- [ ] Auto-save on blur — edits persisted to SQLite.
+- [ ] New AI notes slide in with animation.
+- [ ] Blue left border on new AI notes, fades after 5 seconds.
+- [ ] Hover "×" button on each note for deletion.
+- [ ] Smooth scrolling with rubber-banding at edges.
+- [ ] Notes persisted as RTF/HTML (rich text preserved on reload).
+- [ ] All concept map / tree code is removed from the codebase.
 
 ---
 
-## Layout — 2×2 Grid
+## 3. ALL Dividers Must Be Movable
+
+**Founder's exact words:**
+> "主面板上这些这些这些个线都是可以互相移动的，这样可以调整窗口大小呀，横着的线可以竖着线都可以都可以移动的"
+
+**Translation:** All these lines on the main panel should be movable to adjust window sizes. Horizontal lines and vertical lines should all be movable.
+
+### Why v1.1-r1 Failed
+The horizontal divider between top and bottom rows was **fixed at 65/35** — a visual-only separator with no drag interaction. The vertical divider was draggable, but the horizontal was not. This prevents users from freely resizing the 4 quadrants.
+
+### Exact Behavior (v1.1-r2)
+
+**1. Vertical divider (between left and right columns):**
+- Keep existing drag implementation (works correctly).
+- Drag gesture updates `vm.notesWidth` or equivalent.
+- Runs full height of the 2×2 grid (top row + bottom row).
+- Moves both columns simultaneously.
+- Min: left column 200px. Max: left column 500px.
+
+**2. Horizontal divider (between top and bottom rows):**
+- **NEW: Must become draggable.**
+- Drag handle: a 12px-tall strip between the top and bottom rows.
+- Visual: 1px `#E8E8E8` top line, 1px `#E8E8E8` bottom line, with a 10px active drag area in between.
+- On hover: cursor changes to `resizeUpDown` (pointing hand with vertical arrows).
+- Drag gesture updates `vm.topRowRatio` (float, 0.3–0.8).
+- Dragging the horizontal divider resizes all 4 quadrants simultaneously.
+- Min top row height: 30% of available height. Max: 80%.
+- Min bottom row height: 20% of available height. Max: 70%.
+- Default: 55% top / 45% bottom (**changed from 65/35** — more balanced).
+- Smooth, real-time resize during drag (no snap, no animation, instant following of cursor).
+
+**3. Combined behavior:**
+- Both dividers are independent and can be moved simultaneously (though in practice, the user moves one at a time).
+- Window resize respects divider positions as ratios (not absolute pixel values), so resizing the window preserves the user's preferred layout proportions.
+- The 4 quadrants freely resize based on both divider positions.
+
+### Acceptance Criteria
+- [ ] Horizontal divider is draggable with `resizeUpDown` cursor on hover.
+- [ ] Drag handle is 12px tall and visually clear.
+- [ ] Dragging horizontal divider smoothly resizes top/bottom rows.
+- [ ] Top row range: 30%–80%. Bottom row range: 20%–70%.
+- [ ] Default split: 55/45 (top/bottom).
+- [ ] Window resize preserves user's divider ratios.
+- [ ] Both dividers work independently and simultaneously.
+
+---
+
+## 4. Beautiful, Polished UI
+
+**Founder's exact words:**
+> "现在的界面怎么这么丑呢"
+
+**Translation:** The current interface is so ugly.
+
+### Why v1.1-r1 Failed
+The UI used hardcoded hex colors everywhere (`#5A5A5A`, `#C0C0C0`, `#E8E8E8`, `#F8F8F8`), basic SwiftUI shapes, no design system, no animations, and no attention to visual detail. It looked like a prototype, not a professional app.
+
+### Exact Requirements (v1.1-r2)
+
+**1. Design system — Create a centralized design token system:**
+- Define colors as semantic tokens (not hardcoded hex):
+  - `surfacePrimary` (white)
+  - `surfaceSecondary` (light gray)
+  - `textPrimary` (near-black)
+  - `textSecondary` (medium gray)
+  - `textTertiary` (light gray)
+  - `accentBlue` (action blue)
+  - `accentPurple` (AI/highlight purple)
+  - `divider` (border lines)
+  - `selection` (text selection highlight)
+- Define typography as semantic tokens:
+  - `body` (13pt Inter)
+  - `caption` (11pt Inter)
+  - `small` (10pt Inter)
+  - `title` (14pt Inter semibold)
+- Define spacing as 4px grid:
+  - `xs: 4`, `sm: 8`, `md: 12`, `lg: 16`, `xl: 24`, `xxl: 32`
+
+**2. Visual polish:**
+- Proper corner radii on all cards (8px standard, 12px for popups).
+- Subtle shadows (`NSShadow` or SwiftUI shadow) with low opacity on floating elements (popup, cards).
+- Smooth 200ms ease-in-out animations on all state transitions (show/hide, add/remove).
+- Consistent padding using the 4px grid system — no arbitrary padding values.
+- Proper `NSScrollView` integration for smooth scrolling everywhere.
+- Use `VisualEffectView` (NSVisualEffectView) for floating/overlay elements to match macOS design language.
+
+**3. Color palette refresh:**
+| Token | Old color | New color | Usage |
+|-------|-----------|-----------|-------|
+| surfacePrimary | `#FFFFFF` | `#FFFFFF` | Main backgrounds |
+| surfaceSecondary | `#F8F8F8` | `#F5F5F5` | Header backgrounds, secondary fills |
+| textPrimary | `#0A0A0A` | `#1A1A1A` | Body text |
+| textSecondary | `#5A5A5A` | `#6B6B6B` | Labels, subtitles |
+| textTertiary | `#C0C0C0` | `#9E9E9E` | Placeholder text |
+| accentBlue | `#1A5FD4` | `#2563EB` | Buttons, links, selection highlight |
+| accentPurple | `#7C3AED` | `#7C3AED` | AI indicator (unchanged, good) |
+| divider | `#E8E8E8` | `#E5E5E5` | Separator lines |
+| selection | `#E8F0FE` | `#DBEAFE` | Selected/highlighted backgrounds |
+
+**4. Typography:**
+- Use Inter font throughout (already bundled).
+- Proper font weights: Regular (400), Medium (500), Semibold (600), Bold (700).
+- Line heights: 1.4× font size for body text, 1.2× for headings.
+- Proper letter-spacing: `-0.01em` for body text (Apple HIG standard).
+
+**5. Animations:**
+- All view transitions: `.animation(.easeInOut(duration: 0.2), value: state)`.
+- New content appearing: fade + slight vertical slide (5px offset).
+- Content disappearing: fade + slight scale down (0.95).
+- Divider drag: instant, no animation (follows cursor exactly).
+- Popup appear/disappear: fade + scale (1.0 → 1.02 → 1.0).
+
+**6. Layout polish:**
+- Proper margins: 16px horizontal padding in quadrants (was 12px in v1.1-r1).
+- Consistent 8px spacing between elements.
+- 12px padding inside cards.
+- Header height: 32px (was variable — standardize).
+- Proper hit targets: minimum 32×32 for buttons.
+
+**7. macOS native feel:**
+- Title bar integration: use `.windowToolbarStyle(.unified)` for compact look.
+- Proper resize cursors on dividers.
+- Native scrollbar styling (no custom scrollbar override).
+- Proper window shadow and corner radius (standard macOS window).
+
+### Acceptance Criteria
+- [ ] Design token system implemented as Swift constants/enums.
+- [ ] All hardcoded hex colors replaced with semantic tokens.
+- [ ] Consistent 4px grid spacing throughout the app.
+- [ ] Smooth 200ms animations on all state transitions.
+- [ ] Proper corner radii (8px cards, 12px popups).
+- [ ] Subtle shadows on floating elements.
+- [ ] Professional color palette matches new spec.
+- [ ] Consistent typography with proper line heights.
+- [ ] macOS-native scrollbar and window styling.
+
+---
+
+## 5. Layout — 2×2 Grid with ALL Movable Dividers
 
 ### ASCII Diagram
 
@@ -186,21 +352,23 @@ Grasp is a next-generation AI note-taking assistant for live lectures and meetin
 │ TopBarView  [unchanged]                                 │
 ├──────┬──────────────────────┬───────────────────────────┤
 │      │                       │                           │
-│ Side │  TRANSCRIPT           │  AI NOTES                 │
-│ bar  │  (top-left)           │  (top-right)              │
-│      │   • sealed blocks     │   • concept map outline  │
-│      │   • active block      │   • flat notes (legacy)  │
-│      │   • interim text      │   • add/edit/delete       │
-│      │   • translation       │                           │
+│ Side │  TRANSCRIPT           │  AI NOTES                │
+│ bar  │  (top-left)           │  (top-right)             │
+│      │   • sealed blocks     │   • Apple Notes-style    │
+│      │   • active block      │   • rich text inline     │
+│      │   • interim text      │   • click to edit        │
+│      │   • translation       │   • flat, no bullets     │
 │      │                       │                           │
-│      ├──────────────────────┼───────────────────────────┤
-│      │  AUTO EXPLAIN         │  CONTEXTUAL               │
-│      │  (bottom-left)        │  (bottom-right)           │
-│      │  ★ always visible     │   priority chain:         │
-│      │  ★ never hidden       │   1. Cold Call Card       │
-│      │    behind a tab       │   2. Save Card             │
-│      │                       │   3. Search Card           │
-│      │                       │   4. Empty placeholder     │
+│      ├── ◀── DRAG ──▶       ├── ◀── DRAG ──▶          │
+│      │  (horizontal divider) │  (horizontal divider)    │
+│      │                       │                           │
+│      │  AUTO EXPLAIN         │  CONTEXTUAL              │
+│      │  (bottom-left)        │  (bottom-right)          │
+│      │  ★ always visible     │   priority chain:        │
+│      │  ★ never hidden       │   1. Cold Call Card      │
+│      │    behind a tab       │   2. Save Card           │
+│      │                       │   3. Search Card         │
+│      │                       │   4. Empty placeholder   │
 ├──────┴──────────────────────┴───────────────────────────┤
 │ Bottom Panel (UNCHANGED — tabs + CC column)              │
 └────────────────────────────────────────────────────────┘
@@ -208,37 +376,38 @@ Grasp is a next-generation AI note-taking assistant for live lectures and meetin
 
 ### Dimensions
 
-| Region | Ratio | Resizable? | Min/Max | Notes |
-|--------|-------|------------|---------|-------|
-| Top row (Transcript + Notes) | **65%** of window height | No — fixed | N/A | `geo.size.height * 0.65` |
-| Bottom row (AutoExplain + Contextual) | **35%** of window height | No — fixed | N/A | `geo.size.height * 0.35` |
-| Left column (Transcript + AutoExplain) | **55%** of window width | Yes — drag handle | Left min: 200px, Left max: 500px | `geo.size.width * 0.55` default |
-| Right column (Notes + Contextual) | **45%** of window width | Yes — drag handle (linked) | Derived from left width | `geo.size.width - leftWidth - 1px` |
+| Region | Default Ratio | Resizable? | Range | Notes |
+|--------|---------------|------------|-------|-------|
+| Top row (Transcript + Notes) | **55%** of window height | **Yes** — draggable horizontal divider | 30%–80% | Default changed from 65% to 55% |
+| Bottom row (AutoExplain + Contextual) | **45%** of window height | **Yes** — linked to top row | 20%–70% | Default changed from 35% to 45% |
+| Left column (Transcript + AutoExplain) | **55%** of window width | **Yes** — draggable vertical divider | Left min: 200px, Left max: 500px | Unchanged from v1.1-r1 |
+| Right column (Notes + Contextual) | **45%** of window width | **Yes** — linked to left column | Derived from left width | Unchanged from v1.1-r1 |
 
 ### Divider Specs
 
 | Divider | Location | Thickness | Visual | Interaction |
 |---------|----------|-----------|--------|-------------|
-| Vertical | Between left/right columns, full height of both rows | 1px | Line fill `#E8E8E8` | Drag gesture → updates `vm.notesWidth`. Affects both rows simultaneously. |
-| Horizontal | Between top/bottom rows | 5px | 1px `#E8E8E8` top line, 1px `#E8E8E8` bottom line, 3px `#F8F8F8` gap | Not resizable. Visual separator only. |
+| **Vertical** ⬥ | Between left/right columns, full height of both rows | 1px line + 4px hit area (total 5px) | Line fill `#E5E5E5`. On hover: 2px `#2563EB` accent line appears. | Drag gesture → updates `vm.notesWidth`. Affects both rows simultaneously. Cursor: `resizeLeftRight`. |
+| **Horizontal** ⬥ | Between top/bottom rows | 1px line + 10px hit area (total 12px) | 1px `#E5E5E5` top, 1px `#E5E5E5` bottom, 10px transparent drag area. On hover: accent highlight. | **NEW: Draggable.** Drag gesture → updates `vm.topRowRatio`. Affects both columns simultaneously. Cursor: `resizeUpDown`. |
 
 ### Quadrant Behavior Summary
 
 | Quadrant | View | Always visible? | Content |
 |----------|------|-----------------|---------|
 | Top-left | `TranscriptPanelView` | Yes | Sealed blocks + active block + interim text + translation inline |
-| Top-right | `NotesPanelView` | Yes | Concept map outline (or flat notes for legacy lectures) |
+| Top-right | `NotesPanelView` | Yes | **Apple Notes-style** rich text editor — flat, inline editable, no bullets |
 | Bottom-left | `AutoExplainBottomQuadrant` | Yes — **never removed from hierarchy** | Idle placeholder OR `AutoExplainCardView`. Header always shows "AUTO EXPLAIN" |
 | Bottom-right | `ContextualBottomQuadrant` | Yes — **always present in hierarchy** | One of: `ColdCallCardView` > `SaveCardView` > `SearchCardView` > empty placeholder |
 
 ### Window Resize Behavior
 
-- Ratios scale proportionally — 65/35 and 55/45 are relative to current window dimensions.
+- Ratios scale proportionally — divider positions are stored as ratios, not pixels.
 - Minimum window: 960×640. Below this, left column may clip (min 200px enforced).
+- Top/bottom ratios preserved on window resize.
 
 ---
 
-## Bug Fixes
+## 6. Bug Fixes (carried forward from v1.1-r1)
 
 | Bug | Fix |
 |-----|-----|
@@ -247,13 +416,33 @@ Grasp is a next-generation AI note-taking assistant for live lectures and meetin
 | `interimText` never populated | `handleInterim` sets `interimText = t` |
 | Transcription duplication | Removed `interimText` concatenation in `BlockView` |
 | Auto Explain polluting search history | Removed `db.saveSearch` from `autoExplain()` |
-| Selection popup not appearing | Replaced `NSEvent` monitor with `NotificationCenter` |
-| Selection popup flicker | Added 80ms debounce |
 | Keyboard shortcuts not wired up | All 5 documented shortcuts (`⌘⇧P`, `⌘⇧K`, `⌘⇧L`, `⌘⇧E`, `⌘⇧X`) implemented |
+
+**Note:** The selection popup NotificationCenter fix from v1.1-r1 is **replaced** by the new instant-popup approach (Section 1). The old 80ms debounce fix is obsolete.
 
 ---
 
-## Known Issues
+## 7. Keyboard Shortcuts
+
+| Shortcut | Action | Notes |
+|----------|--------|-------|
+| `⌘⇧P` | Pause/Resume transcription | Unchanged |
+| `⌘⇧F` | Toggle full transcript view | Unchanged |
+| `⌘N` | New lecture / New note (in notes panel) | Unchanged |
+| `⌘⇧N` | Focus notes panel | Unchanged |
+| `⌘⇧K` | Save selected text as Knowledge | Unchanged |
+| `⌘⇧L` | Save selected text as Language | International mode only |
+| `⌘⇧E` | Trigger Instant Search on selected text | Unchanged |
+| `⌘B` | Bold (in notes rich text editor) | **NEW** |
+| `⌘I` | Italic (in notes rich text editor) | **NEW** |
+| `⌘U` | Underline (in notes rich text editor) | **NEW** |
+| `Esc` | Dismiss selection popup / current card | Unchanged |
+| `⌘⇧A` | Focus auto-explain panel | Unchanged |
+| `⌘⇧C` | Show/hide cold call card | Unchanged |
+
+---
+
+## 8. Known Issues (pre-existing, unchanged from v1.1-r1)
 
 | Issue | Severity | Notes |
 |-------|----------|-------|
@@ -268,13 +457,70 @@ Grasp is a next-generation AI note-taking assistant for live lectures and meetin
 
 ---
 
-## Non-Goals (v1.1)
+## 9. Non-Goals (v1.1-r2)
 
 - No mobile app (iOS/Android)
 - No cloud sync or user accounts
 - No offline transcription
 - No custom model fine-tuning
 - No export formats beyond RTF
-- No user-resizable horizontal divider (fixed 65/35)
 - No bottom panel modification (kept exactly as v1.0)
 - No removal of redundant bottom-panel tabs (Auto tab, Current tab — kept for now)
+- **No hierarchical concept maps** — explicitly removed per Founder's requirements
+- **No bullet lists in notes** — explicitly removed per Founder's requirements
+- **No indented outlines** — explicitly removed per Founder's requirements
+
+---
+
+## Appendix A: Files to Modify
+
+| File | Change |
+|------|--------|
+| `Grasp/Views/Notes/NotesPanelView.swift` | **Full rewrite** — remove concept map tree, build Apple Notes-style rich text editor |
+| `Grasp/Views/Transcript/TranscriptPanelView.swift` | Remove 80ms `asyncAfter` debounce. Replace with instant synchronous popup. |
+| `Grasp/Views/Layout/LiveTabView.swift` | Add draggable horizontal divider. Update layout helpers for top/bottom ratio. |
+| `Grasp/Models/AppViewModel.swift` | Remove `conceptMap` property and all tree-related methods. Add `topRowRatio` property. Add rich text support. |
+| `Grasp/Models/ConceptNode.swift` | **Delete file** — concept map data model no longer needed. |
+| `Grasp/Models/NoteBlock.swift` | Update to support rich text storage (RTF/HTML). |
+| `Grasp/Design/DesignTokens.swift` | **New file** — centralized design tokens (colors, fonts, spacing). |
+| `Grasp/Views/Components/SelectionPopupView.swift` | Rewrite for instant appearance, NSVisualEffectView, pill shape. |
+
+## Appendix B: Files to Delete
+
+| File | Reason |
+|------|--------|
+| `Grasp/Models/ConceptNode.swift` | Concept map model — Founder explicitly rejected hierarchical notes |
+| Any remaining code that renders concept tree, indented bullets, or depth-based layout | Replaced by flat rich text notes |
+
+## Appendix C: Acceptance Test Script
+
+### Test 1: Selection Popup Speed
+1. Start a lecture with active transcription.
+2. Select any 2+ characters in the transcript.
+3. **Expected:** Popup appears immediately (no perceptible delay).
+4. Verify no `asyncAfter` or `DispatchQueue` delay in the selection handler.
+
+### Test 2: Apple Notes Behavior
+1. Open the Notes panel.
+2. **Expected:** Flat white panel, no bullets, no indentation.
+3. Click on a note → it becomes editable in place.
+4. Type text. Press ⌘B → bold. Press ⌘I → italic.
+5. Press Enter → new note appears below.
+6. Press Shift+Enter → line break within the same note.
+7. Click elsewhere → changes are saved.
+8. Verify RTF/HTML persistence by reloading the lecture.
+
+### Test 3: All Dividers Movable
+1. Drag the vertical divider → left/right columns resize.
+2. Drag the horizontal divider → top/bottom rows resize.
+3. Verify horizontal drag works smoothly.
+4. Verify min/max constraints: top row 30%–80%, left column 200px–500px.
+5. Resize the window → divider ratios are preserved.
+
+### Test 4: UI Polish
+1. Verify consistent spacing (4px grid throughout).
+2. Verify no hardcoded hex colors (all use design tokens).
+3. Verify smooth 200ms animations on all state transitions.
+4. Verify proper corner radii (8px cards, 12px popups).
+5. Verify shadows on floating elements.
+6. Visually compare to Apple Notes for fit and finish.

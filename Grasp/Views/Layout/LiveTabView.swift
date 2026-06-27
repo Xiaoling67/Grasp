@@ -12,30 +12,27 @@ struct LiveTabView: View {
 
                     // Vertical divider with drag handle (runs full height of both rows)
                     Rectangle()
-                        .fill(Color(hex: "E8E8E8"))
+                        .fill(Color.divider)
                         .frame(width: 1)
                         .gesture(DragGesture().onChanged {
                             vm.notesWidth = max(200, min(500,
                                 vm.notesWidth - $0.translation.width))
                         })
+                        .onHover { hovering in
+                            if hovering { NSCursor.resizeLeftRight.push() }
+                            else { NSCursor.pop() }
+                        }
 
                     NotesPanelView()
                         .frame(width: rightColumnWidth(geo))
                 }
                 .frame(height: topRowHeight(geo))
 
-                // ── Horizontal divider ──
-                Rectangle()
-                    .fill(Color(hex: "F8F8F8"))
-                    .frame(height: 5)
-                    .overlay(
-                        Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 1),
-                        alignment: .top
-                    )
-                    .overlay(
-                        Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 1),
-                        alignment: .bottom
-                    )
+                // ── Horizontal divider — DRAGGABLE (v1.1-r2) ──
+                HorizontalDragHandle(
+                    topRowRatio: $vm.topRowRatio,
+                    availableHeight: geo.size.height - 5  // subtract divider height
+                )
 
                 // ── Bottom Row: Auto Explain | ColdCall/Save/Search ──
                 HStack(spacing: 0) {
@@ -44,7 +41,7 @@ struct LiveTabView: View {
 
                     // Vertical divider (same vertical line, continues from above)
                     Rectangle()
-                        .fill(Color(hex: "E8E8E8"))
+                        .fill(Color.divider)
                         .frame(width: 1)
 
                     // Bottom-Right: Cold Call / Save / Search (contextual)
@@ -66,11 +63,46 @@ struct LiveTabView: View {
     }
 
     private func topRowHeight(_ geo: GeometryProxy) -> CGFloat {
-        (geo.size.height - 5) * 0.65  // 65% of available height (minus 5px divider)
+        (geo.size.height - 12) * vm.topRowRatio
     }
 
     private func bottomRowHeight(_ geo: GeometryProxy) -> CGFloat {
-        (geo.size.height - 5) * 0.35
+        (geo.size.height - 12) * (1 - vm.topRowRatio)
+    }
+}
+
+// MARK: - Draggable Horizontal Divider
+
+struct HorizontalDragHandle: View {
+    @Binding var topRowRatio: CGFloat
+    let availableHeight: CGFloat
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.clear)
+            .frame(height: 12)
+            .overlay(
+                Rectangle().fill(Color.divider).frame(height: 1),
+                alignment: .top
+            )
+            .overlay(
+                Rectangle().fill(Color.divider).frame(height: 1),
+                alignment: .bottom
+            )
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        let totalHeight = availableHeight
+                        let dragY = value.startLocation.y + value.translation.height
+                        let ratio = max(0.30, min(0.80, dragY / totalHeight))
+                        topRowRatio = ratio
+                    }
+            )
+            .onHover { hovering in
+                if hovering { NSCursor.resizeUpDown.push() }
+                else { NSCursor.pop() }
+            }
     }
 }
 
@@ -83,16 +115,16 @@ struct AutoExplainBottomQuadrant: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("AUTO EXPLAIN").font(.inter(size: 11, weight: .semibold))
-                    .foregroundColor(Color(hex: "5A5A5A"))
+                Text("AUTO EXPLAIN").font(.inter(size: AppTypography.caption, weight: .semibold))
+                    .foregroundColor(.textSecondary)
                 Spacer()
                 if vm.autoExplainNew || vm.autoExplainStreaming {
-                    Circle().fill(Color(hex: "7C3AED")).frame(width: 5, height: 5)
+                    Circle().fill(Color.accentPurple).frame(width: 5, height: 5)
                 }
             }
-            .padding(.horizontal, 12).padding(.vertical, 8)
-            .background(Color(hex: "F8F8F8"))
-            .overlay(Rectangle().fill(Color(hex: "E8E8E8")).frame(height: 1),
+            .padding(.horizontal, Spacing.sm).padding(.vertical, Spacing.xs)
+            .background(Color.surfaceSecondary)
+            .overlay(Rectangle().fill(Color.divider).frame(height: 1),
                      alignment: .bottom)
 
             // Content
@@ -102,14 +134,14 @@ struct AutoExplainBottomQuadrant: View {
                 idlePlaceholder
             }
         }
-        .background(Color.white)
+        .background(Color.surfacePrimary)
     }
 
     var idlePlaceholder: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.xs) {
             Spacer()
             Text("Watching for unfamiliar terms…")
-                .font(.inter(size: 12)).foregroundColor(Color(hex: "C0C0C0"))
+                .font(.inter(size: AppTypography.caption)).foregroundColor(.textTertiary)
                 .multilineTextAlignment(.center)
             Spacer()
         }
@@ -128,7 +160,7 @@ struct ContextualBottomQuadrant: View {
             Group {
                 if let p = vm.coldCallPhase {
                     ColdCallCardView(phase: p)
-                        .padding(12)
+                        .padding(Spacing.sm)
                 } else if let card = vm.activeCard {
                     switch card {
                     case .save:
@@ -142,18 +174,18 @@ struct ContextualBottomQuadrant: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .background(Color.white)
+        .background(Color.surfacePrimary)
     }
 
     var emptyPlaceholder: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: Spacing.xxs) {
             Spacer()
             Text("COLD CALL / SAVE / SEARCH")
-                .font(.inter(size: 11, weight: .semibold))
-                .foregroundColor(Color(hex: "9A9A9A"))
+                .font(.inter(size: AppTypography.caption, weight: .semibold))
+                .foregroundColor(.textTertiary)
             Text("Activity appears here")
-                .font(.inter(size: 11))
-                .foregroundColor(Color(hex: "C0C0C0"))
+                .font(.inter(size: AppTypography.caption))
+                .foregroundColor(.textTertiary)
             Spacer()
         }
     }

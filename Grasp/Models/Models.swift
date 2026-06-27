@@ -33,21 +33,6 @@ struct SearchResult: Identifiable {
 
 struct SlideItem: Codable { var index: Int; var title: String; var concepts: [String]; var keywords: [String] }
 
-// MARK: - Concept Map (v1.1)
-
-struct ConceptNode: Identifiable, Codable {
-    var id: String
-    var concept: String                  // short concept name
-    var parentId: String?                // nil = root-level concept
-    var level: Int                       // 0 = core thesis, 1 = key point, 2 = detail
-    var content: String                  // the explanation/definition (≤ 60 words)
-    var slideIndex: Int                  // which slide this belongs to
-    var lectureId: String                // which lecture
-    var createdAt: Int64                 // epoch ms
-    var updatedAt: Int64                 // epoch ms — updated when deepened
-    var children: [ConceptNode]?         // sub-concepts (populated at render time, not stored)
-}
-
 // UI state
 struct LiveBlock: Identifiable { let id: String; var blockIndex: Int; var textEn: String; var textZh: String?; var isSealed: Bool; var createdAt: Int64? }
 struct TabItem: Identifiable { var id: String; var type: TabType; var lectureId: String?; var label: String; enum TabType { case live, past } }

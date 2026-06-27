@@ -16,10 +16,10 @@ import Foundation; import SwiftUI
     @Published var selectedBlockId: String? = nil
     @Published var showFullTranscript = false
     @Published var highlightedBlockIds = Set<String>()
+    @Published var deepgramStatus = "disconnected"
 
-    // Notes (Spec 7.2: notesStore)
+    // Notes (Spec 7.2: notesStore) — flat rich-text list, no concept map
     @Published var noteBlocks = [NoteBlock](); @Published var slideStructure = [SlideItem]()
-    @Published var conceptMap = [ConceptNode]()
 
     // Bottom panel (Spec 7.2: lectureStore)
     @Published var activeCard: ActiveCardState? = nil; @Published var bottomTab = "current"
@@ -41,16 +41,15 @@ import Foundation; import SwiftUI
     @Published var showOnboarding = false; @Published var onboardingChecked = false
     @Published var toastMessage: String? = nil; @Published var toastType = "info"
 
-    // Layout
+    // Layout — v1.1-r2: all dividers movable
     @Published var notesWidth = 400.0
+    @Published var topRowRatio: CGFloat = 0.55  // default 55/45, range 0.30-0.80
 
     private let db = DatabaseService.shared; private let ds = DeepSeekService.shared
     private let dg = DeepgramService.shared; private let au = AudioService.shared
     private let tr = QwenTranslationService.shared
     private var interimBuf = ""; private var lastCC: Date?; private var noteTask: Task<Void,Never>?
     private var searchCache = [String:(String,String)]()
-    private var conceptMapTimer: Timer?
-    private var lastConceptMapFire: Date = .distantPast
 
     init() { loadPast(); checkOnboarding() }
 
@@ -87,8 +86,6 @@ import Foundation; import SwiftUI
             }
         }
 
-        startConceptMapTimer()
-
         let tab = TabItem(id: "live", type: .live, lectureId: lid, label: name ?? "Live Lecture")
         tabs = [tab] + tabs; activeTabId = "live"
         if !(await AudioService.requestPermission()) {
@@ -112,9 +109,6 @@ import Foundation; import SwiftUI
         isRecording = false; au.stopCapture(); dg.disconnect()
         if let b = activeBlock, !b.textEn.trimmingCharacters(in: .whitespaces).isEmpty { seal(b.textEn) }
         if let lid = activeLectureId { db.stopLecture(id: lid) }
-        await fireConceptMapUpdate()
-        conceptMapTimer?.invalidate()
-        conceptMapTimer = nil
         noteTask?.cancel(); searchCache.removeAll(); coldCallPhase = nil; loadPast()
     }
 
@@ -179,63 +173,6 @@ import Foundation; import SwiftUI
         let capturedText = text; let capturedLid = lid
         Task { await autoExplain(text: capturedText, lectureId: capturedLid) }
         detectCC(text)
-    }
-
-    // MARK: - Concept Map (v1.1)
-
-    private func startConceptMapTimer() {
-        conceptMapTimer?.invalidate()
-        lastConceptMapFire = Date()
-        conceptMapTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
-            Task { [weak self] in await self?.fireConceptMapUpdate() }
-        }
-    }
-
-    @MainActor
-    private func fireConceptMapUpdate() async {
-        guard let lid = activeLectureId else { return }
-
-        // 1. Collect sealed blocks since last fire
-        let since = lastConceptMapFire
-        lastConceptMapFire = Date()
-
-        let windowBlocks = db.getRecentBlocks(lectureId: lid, since: since)
-
-        // 2. Skip if no new content
-        guard !windowBlocks.isEmpty else { return }
-
-        // 3. Get existing Concept Map
-        let existingMap = db.loadConceptMap(lectureId: lid)
-
-        // 4. Get slide structure
-        let slides = slideStructure
-
-        // 5. Build window text
-        let windowText = windowBlocks.map { $0.textEn }.joined(separator: "\n\n")
-
-        // 6. Call DeepSeek
-        guard let updatedNodes = await ds.generateConceptMapUpdate(
-            windowText: windowText,
-            existingMap: existingMap,
-            slides: slides,
-            subject: activeLectureSubject
-        ) else { return }
-
-        // 7. Preserve lectureId on all nodes
-        let nodesWithLectureId = updatedNodes.map { n -> ConceptNode in
-            var node = n
-            // Only set lectureId if it's missing
-            if node.lectureId.isEmpty {
-                node.lectureId = lid
-            }
-            return node
-        }
-
-        // 8. Save to DB
-        db.saveConceptMap(lectureId: lid, nodes: nodesWithLectureId)
-
-        // 9. Update in-memory state
-        conceptMap = nodesWithLectureId
     }
 
     // MARK: - Cold Call (Spec 6.10, 3.4)
@@ -417,13 +354,19 @@ import Foundation; import SwiftUI
     }
 
     // MARK: - Notes (Spec 10.3: handleCopyToNotes)
+    func saveNoteBlockToDb(lectureId: String, slideIndex: Int, slideTitle: String?, content: String, source: String) -> NoteBlock {
+        return db.saveNoteBlock(lectureId: lectureId, slideIndex: slideIndex, slideTitle: slideTitle, content: content, source: source, level: 1)
+    }
     func handleCopyToNotes(text: String) {
         guard let lid = activeLectureId else { return }
         let last = noteBlocks.last
-        let n = db.saveNoteBlock(lectureId: lid, slideIndex: last?.slideIndex ?? 0, slideTitle: last?.slideTitle, content: text, source: "user", level: last?.level ?? 1)
+        let n = db.saveNoteBlock(lectureId: lid, slideIndex: last?.slideIndex ?? 0, slideTitle: last?.slideTitle, content: text, source: "user", level: 1)
         noteBlocks.append(n)
     }
-    func updateNote(id: String, content: String, level: Int?) { db.updateNoteBlock(id: id, content: content, level: level) }
+    func updateNote(id: String, content: String, level: Int?) {
+        if let lvl = level { db.updateNoteBlock(id: id, content: content, level: lvl) }
+        else { db.updateNoteBlock(id: id, content: content, level: nil) }
+    }
     func deleteNote(id: String) { db.deleteNoteBlock(id: id); noteBlocks.removeAll { $0.id == id } }
 
     // MARK: - Tabs (Spec 7.2: appStore)
@@ -432,7 +375,6 @@ import Foundation; import SwiftUI
         let t = TabItem(id: "past-\(id)", type: .past, lectureId: id, label: name ?? "Untitled")
         tabs.append(t); activeTabId = t.id
         slideStructure = db.getSlideStructure(lectureId: id)
-        conceptMap = db.loadConceptMap(lectureId: id)
         noteBlocks = db.getNoteBlocks(lectureId: id)
     }
     func closeTab(id: String) { tabs.removeAll { $0.id == id }; if activeTabId == id { activeTabId = tabs.last?.id } }
@@ -443,7 +385,7 @@ import Foundation; import SwiftUI
 
     // MARK: - Reset
     private func resetLive() { liveBlocks = []; activeBlockId = nil; interimText = ""; interimBuf = ""
-        noteBlocks = []; slideStructure = []; conceptMap = []; activeCard = nil; bottomTab = "current"
+        noteBlocks = []; slideStructure = []; activeCard = nil; bottomTab = "current"
         sessionSaves = []; sessionSearches = []; coldCallPhase = nil; lastCC = nil; searchCache.removeAll() }
 
     /// Holds the most recent text selection from the transcript, for keyboard shortcuts.
@@ -471,34 +413,4 @@ import Foundation; import SwiftUI
     func handleColdCallShortcut() {
         if coldCallPhase != nil { dismissCC() }
     }
-
-    // MARK: - Concept Node → Block Highlighting
-
-    /// When a concept node is tapped, highlight transcript blocks that mention the concept.
-    func highlightBlocksForConcept(_ node: ConceptNode) {
-        let conceptWords = node.concept.lowercased().split(separator: " ").filter { $0.count > 2 }
-        guard !conceptWords.isEmpty else { return }
-
-        let matchingBlockIds = liveBlocks.filter { block in
-            let text = block.textEn.lowercased()
-            return conceptWords.contains(where: { text.contains($0) })
-        }.map(\.id)
-
-        highlightedBlockIds = Set(matchingBlockIds)
-
-        // Auto-clear highlight after 3 seconds
-        Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-            highlightedBlockIds = []
-        }
-    }
-
-    /// Right-click concept node → add to Knowledge Profile
-    func addConceptToProfile(_ node: ConceptNode) {
-        MemoryService.shared.recordInteraction(concept: node.concept, action: .markKnown)
-        showToast("Added \"\(node.concept)\" to Knowledge Profile", type: "info")
-    }
-
-    // Debug
-    @Published var deepgramStatus = ""; @Published var transcriptsReceived = 0
 }
