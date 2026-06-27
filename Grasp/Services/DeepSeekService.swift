@@ -259,6 +259,8 @@ final class DeepSeekService {
         let notesText = recentNotes.isEmpty ? "(none)" : recentNotes.map { "- " + $0.content }.joined(separator: "\n")
         let subjectLabel = subject.isEmpty ? "this subject" : subject
         let system = "You help a student prepare a spoken answer to their professor's cold-call question. Your answer must be concise enough to say aloud in 30 seconds and grounded in what was taught today."
+        let knownTermsList = MemoryService.shared.getKnownTerms()
+        let knownTermsBlock = knownTermsList.isEmpty ? "" : "\nKnown terms (the student already understands these):\n\(knownTermsList.joined(separator: ", "))\n"
         let prompt = """
         Course: \(subject.isEmpty ? "Unknown" : subject)
         \(st.isEmpty ? "" : "Topics covered today:\n\(st)\n")
@@ -267,7 +269,7 @@ final class DeepSeekService {
 
         Recent transcript (what the professor has been explaining):
         \(tx.isEmpty ? "(no transcript yet)" : tx)
-
+        \(knownTermsBlock)
         The professor just asked: "\(question)"
 
         Generate a helpful spoken answer. Prioritize information from the transcript and notes above. If the transcript doesn't directly address the question, supplement with standard \(subjectLabel) knowledge — but prefer lecture content.

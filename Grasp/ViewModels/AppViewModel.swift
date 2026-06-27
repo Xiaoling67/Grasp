@@ -42,7 +42,7 @@ import Foundation; import SwiftUI
     @Published var toastMessage: String? = nil; @Published var toastType = "info"
 
     // Layout
-    @Published var notesWidth = 300.0
+    @Published var notesWidth = 400.0
 
     private let db = DatabaseService.shared; private let ds = DeepSeekService.shared
     private let dg = DeepgramService.shared; private let au = AudioService.shared
