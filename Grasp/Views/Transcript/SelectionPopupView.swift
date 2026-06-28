@@ -2,35 +2,42 @@ import SwiftUI
 import AppKit
 
 // v1.1-r2: Instant pill-shaped popup with NSVisualEffectView material
+// 4 consistent buttons: K (bookmark.fill), L (character.bubble.fill), Search (magnifyingglass), Note (square.and.pencil)
 struct SelectionPopupView: View {
     @EnvironmentObject var vm: AppViewModel; let query: String; let blockIndex: Int; let x: CGFloat; let y: CGFloat; let onDismiss: () -> Void
 
     var body: some View {
         HStack(spacing: 2) {
-            Button(action: { vm.handleSaveAction(type: "knowledge", text: query); onDismiss() }) {
-                Label("K", systemImage: "bookmark.fill")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: 12))
+            // K — bookmark.fill icon + "K" label
+            popupButton(icon: "bookmark.fill", label: "K") {
+                vm.handleSaveAction(type: "knowledge", text: query)
+                onDismiss()
             }
-            .popupBtn()
 
             popupDivider
 
+            // L — character.bubble.fill icon + "L" label (International mode only)
             if vm.activeLectureMode == "international" {
-                Button(action: { vm.handleSaveAction(type: "language", text: query); onDismiss() }) {
-                    Label("L", systemImage: "character.bubble.fill")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 12))
+                popupButton(icon: "character.bubble.fill", label: "L") {
+                    vm.handleSaveAction(type: "language", text: query)
+                    onDismiss()
                 }
-                .popupBtn()
                 popupDivider
             }
 
-            Button(action: { vm.triggerSearch(query: query, blockIndex: blockIndex); onDismiss() }) {
-                Label("Search", systemImage: "magnifyingglass")
-                    .font(.system(size: 12))
+            // Search — magnifyingglass icon + "Search" label
+            popupButton(icon: "magnifyingglass", label: "Search") {
+                vm.triggerSearch(query: query, blockIndex: blockIndex)
+                onDismiss()
             }
-            .popupBtn(color: .accentBlue)
+
+            popupDivider
+
+            // Note — square.and.pencil icon + "Note" label → copies to notes
+            popupButton(icon: "square.and.pencil", label: "Note") {
+                vm.handleCopyToNotes(text: query)
+                onDismiss()
+            }
         }
         .padding(.vertical, Spacing.xxs).padding(.horizontal, Spacing.xs)
         .background(
@@ -43,6 +50,18 @@ struct SelectionPopupView: View {
                 .stroke(Color.divider, lineWidth: 1)
         )
         .position(x: min(max(x, 100), 750), y: max(y - 44, 8))
+    }
+
+    /// Consistent button style: icon + short label, plain appearance, same dimensions
+    private func popupButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(label, systemImage: icon)
+                .font(.system(size: 12))
+        }
+        .buttonStyle(.plain)
+        .foregroundColor(.textPrimary)
+        .padding(.horizontal, 8)
+        .frame(height: 24)
     }
 
     var popupDivider: some View {
@@ -64,10 +83,4 @@ struct VisualEffectView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {}
-}
-
-extension View {
-    func popupBtn(color: Color = Color.textPrimary) -> some View {
-        self.buttonStyle(.plain).foregroundColor(color).padding(.horizontal, 8).frame(height: 24)
-    }
 }

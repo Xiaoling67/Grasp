@@ -3,6 +3,8 @@ import AppKit
 
 // v1.1-r2: Apple Notes-style flat rich-text editor
 // No tree, no bullets, no indentation, no concept map.
+// NSTextView is always present — click to edit, double-click to select word.
+// No container onTapGesture that would intercept NSTextView clicks.
 struct NotesPanelView: View {
     @EnvironmentObject var vm: AppViewModel
     @State private var editingId: String? = nil
@@ -15,27 +17,34 @@ struct NotesPanelView: View {
             if vm.noteBlocks.isEmpty {
                 emptyState
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture { addNote() }
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 0) {
                             ForEach(vm.noteBlocks) { note in
-                                NoteRichEditor(
+                                NoteRow(
                                     note: note,
-                                    isEditing: editingId == note.id,
+                                    isEditing: bindingIsEditing(note.id),
                                     isNew: newNoteIds.contains(note.id),
-                                    onBeginEdit: { beginEdit(note) },
-                                    onCreateNewAfter: { commitAndCreateBelow(note) },
-                                    onSave: { content in saveNote(note, content) },
-                                    onDeleteEmpty: { deleteNote(note) }
+                                    beginEdit: { beginEdit(note) },
+                                    createNewBelow: { commitAndCreateBelow(note) },
+                                    save: { content in saveNote(note, content) },
+                                    deleteEmpty: { deleteNote(note) }
                                 )
                                 .id(note.id)
                                 .transition(.opacity.combined(with: .offset(y: 5)))
                             }
+                            // Empty area tap: create new note at bottom
+                            Color.clear
+                                .frame(height: 120)
+                                .contentShape(Rectangle())
+                                .onTapGesture { addNote() }
                             Color.clear.frame(height: 80).id("notes-bot")
                         }
                     }
-                    .onChange(of: vm.noteBlocks.count) { count in
+                    .onChange(of: vm.noteBlocks.count) { _, count in
                         if count > 0, let last = vm.noteBlocks.last {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 proxy.scrollTo(last.id, anchor: .bottom)
@@ -46,8 +55,7 @@ struct NotesPanelView: View {
             }
         }
         .background(Color.surfacePrimary)
-        .contentShape(Rectangle())
-        .onTapGesture { commitEdit() }
+        // NO onTapGesture on the container — it would intercept NSTextView clicks
     }
 
     // MARK: - Header
@@ -59,7 +67,7 @@ struct NotesPanelView: View {
                 .foregroundColor(.textSecondary)
                 .tracking(0.5)
             Spacer()
-            Text("\(vm.noteBlocks.count)")
+            Text("\\(vm.noteBlocks.count)")
                 .font(.inter(size: AppTypography.small))
                 .foregroundColor(.textTertiary)
             Button(action: addNote) {
@@ -92,10 +100,14 @@ struct NotesPanelView: View {
 
     // MARK: - Edit state management
 
+    private func bindingIsEditing(_ id: String) -> Binding<Bool> {
+        Binding(get: { editingId == id }, set: { if $0 { editingId = id } else { editingId = nil } })
+    }
+
     func beginEdit(_ note: NoteBlock) {
         if editingId == note.id { return }
         commitEdit()
-        editingId = note.id
+        editingId = note.id  // set synchronously, no DispatchQueue.main.asyncAfter
         newNoteIds.remove(note.id)
     }
 
@@ -132,12 +144,11 @@ struct NotesPanelView: View {
         let slideTitle = vm.slideStructure.last?.title ?? vm.noteBlocks.last?.slideTitle
         let n = vm.saveNoteBlockToDb(lectureId: lid, slideIndex: slideIdx, slideTitle: slideTitle, content: "", source: "user")
         vm.noteBlocks.append(n)
-        editingId = n.id
+        editingId = n.id  // synchronous — next view update makes NSTextView first responder
     }
 
     func addNoteBelow(_ note: NoteBlock) {
         guard let lid = vm.activeLectureId else {
-            // If no active lecture, still allow adding a note
             let n = vm.saveNoteBlockToDb(lectureId: "local", slideIndex: 0, slideTitle: nil, content: "", source: "user")
             if let idx = vm.noteBlocks.firstIndex(where: { $0.id == note.id }) {
                 vm.noteBlocks.insert(n, at: idx + 1)
@@ -157,20 +168,19 @@ struct NotesPanelView: View {
     }
 }
 
-// MARK: - NoteRichEditor — NSTextView-based editable note
+// MARK: - NoteRow — SwiftUI wrapper with blue border + hover delete
 
-struct NoteRichEditor: View {
+struct NoteRow: View {
     let note: NoteBlock
-    let isEditing: Bool
+    @Binding var isEditing: Bool
     let isNew: Bool
-    let onBeginEdit: () -> Void
-    let onCreateNewAfter: () -> Void
-    let onSave: (String) -> Void
-    let onDeleteEmpty: () -> Void
+    let beginEdit: () -> Void
+    let createNewBelow: () -> Void
+    let save: (String) -> Void
+    let deleteEmpty: () -> Void
 
     @State private var hovered = false
     @State private var showBlueBorder = false
-    @State private var editingContent: String = ""
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
@@ -180,51 +190,19 @@ struct NoteRichEditor: View {
                 .frame(width: 3)
                 .padding(.trailing, Spacing.xxs)
 
-            // Content area
-            VStack(alignment: .leading, spacing: 0) {
-                if isEditing {
-                    NSTextFieldRepresentable(
-                        text: $editingContent,
-                        noteId: note.id,
-                        isNew: note.content.isEmpty,
-                        onBlur: {
-                            // Save content on blur
-                            let trimmed = editingContent.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if trimmed.isEmpty && note.source == "user" {
-                                onDeleteEmpty()
-                            } else {
-                                onSave(editingContent)
-                            }
-                        },
-                        onEnter: {
-                            // Enter key pressed: save current, create new below
-                            onSave(editingContent)
-                            onCreateNewAfter()
-                        },
-                        onDeleteEmpty: {
-                            onDeleteEmpty()
-                        }
-                    )
-                    .frame(minHeight: 20)
-                } else {
-                    // Display mode
-                    if note.content.isEmpty {
-                        Text("Click to edit…")
-                            .font(.inter(size: AppTypography.body))
-                            .foregroundColor(.textTertiary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, Spacing.xxs)
-                    } else {
-                        AttributedTextDisplay(html: note.content)
-                            .padding(.vertical, Spacing.xxs)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            // NSTextView — always present, handles clicks natively
+            NoteRichEditorView(
+                note: note,
+                isEditing: $isEditing,
+                beginEdit: beginEdit,
+                createNewBelow: createNewBelow,
+                save: save,
+                deleteEmpty: deleteEmpty
+            )
 
             // Delete button on hover
             if hovered && !isEditing {
-                Button(action: onDeleteEmpty) {
+                Button(action: deleteEmpty) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 14))
                         .foregroundColor(.textTertiary)
@@ -237,48 +215,41 @@ struct NoteRichEditor: View {
         .padding(.horizontal, Spacing.md)
         .padding(.vertical, Spacing.xs)
         .background(isEditing ? Color.selectionBg.opacity(0.3) : hovered ? Color.hoverBg.opacity(0.5) : Color.clear)
-        .contentShape(Rectangle())
-        .onTapGesture { if !isEditing { onBeginEdit() } }
         .onHover { h in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                hovered = h
-            }
+            withAnimation(.easeInOut(duration: 0.15)) { hovered = h }
         }
         .onAppear {
             if isNew {
                 showBlueBorder = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                    withAnimation(.easeInOut(duration: 1.0)) {
-                        showBlueBorder = false
-                    }
+                    withAnimation(.easeInOut(duration: 1.0)) { showBlueBorder = false }
                 }
-            }
-        }
-        .onChange(of: isEditing) { _, editing in
-            if editing {
-                editingContent = note.content
             }
         }
     }
 }
 
-// MARK: - NSTextFieldRepresentable — wraps NSTextView for rich text editing
+// MARK: - NoteRichEditorView — NSViewRepresentable wrapping NSTextView
 
-struct NSTextFieldRepresentable: NSViewRepresentable {
-    @Binding var text: String
-    let noteId: String
-    let isNew: Bool
-    let onBlur: () -> Void
-    let onEnter: () -> Void
-    let onDeleteEmpty: () -> Void
+struct NoteRichEditorView: NSViewRepresentable {
+    let note: NoteBlock
+    @Binding var isEditing: Bool
+    let beginEdit: () -> Void
+    let createNewBelow: () -> Void
+    let save: (String) -> Void
+    let deleteEmpty: () -> Void
 
-    func makeNSView(context: Context) -> NSTextView {
-        let tv = NSTextView()
-        tv.isEditable = true
-        tv.isSelectable = true
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeNSView(context: Context) -> NoteTextView {
+        let tv = NoteTextView()
+        tv.isEditable = false       // start in viewing mode; mouseDown enables
+        tv.isSelectable = false
         tv.isRichText = true
         tv.font = NSFont(name: "Inter", size: 13)
-        tv.textColor = .controlTextColor
+        tv.textColor = NSColor.labelColor
         tv.drawsBackground = false
         tv.isVerticallyResizable = true
         tv.isHorizontallyResizable = false
@@ -286,26 +257,6 @@ struct NSTextFieldRepresentable: NSViewRepresentable {
         tv.textContainer?.widthTracksTextView = true
         tv.textContainer?.lineFragmentPadding = 0
         tv.allowsUndo = true
-
-        // Set initial text content
-        if !text.isEmpty {
-            if let data = text.data(using: .utf8),
-               let attrStr = try? NSAttributedString(data: data,
-                    options: [.documentType: NSAttributedString.DocumentType.html],
-                    documentAttributes: nil) {
-                tv.textStorage?.setAttributedString(attrStr)
-            } else {
-                tv.string = text
-            }
-        }
-
-        tv.delegate = context.coordinator
-        context.coordinator.textView = tv
-        context.coordinator.onBlur = onBlur
-        context.coordinator.onEnter = onEnter
-        context.coordinator.onDeleteEmpty = onDeleteEmpty
-        context.coordinator.textBinding = $text
-
         tv.allowsImageEditing = false
         tv.isAutomaticQuoteSubstitutionEnabled = false
         tv.isAutomaticDashSubstitutionEnabled = false
@@ -313,89 +264,146 @@ struct NSTextFieldRepresentable: NSViewRepresentable {
         tv.isAutomaticSpellingCorrectionEnabled = false
         tv.isContinuousSpellCheckingEnabled = false
 
-        // Focus
-        DispatchQueue.main.async {
-            tv.window?.makeFirstResponder(tv)
+        // Set initial content
+        if !note.content.isEmpty {
+            if let data = note.content.data(using: .utf8),
+               let attrStr = try? NSAttributedString(data: data,
+                    options: [.documentType: NSAttributedString.DocumentType.html],
+                    documentAttributes: nil) {
+                tv.textStorage?.setAttributedString(attrStr)
+            } else {
+                tv.string = note.content
+            }
+        }
+
+        tv.delegate = context.coordinator
+        context.coordinator.textView = tv
+        context.coordinator.beginEdit = beginEdit
+        context.coordinator.createNewBelow = createNewBelow
+        context.coordinator.save = save
+        context.coordinator.deleteEmpty = deleteEmpty
+        context.coordinator.isEditingBinding = $isEditing
+        context.coordinator.onSingleClick = beginEdit
+        tv.singleClickHandler = { [weak coordinator = context.coordinator] in
+            coordinator?.beginEdit?()
         }
 
         return tv
     }
 
-    func updateNSView(_ nsView: NSTextView, context: Context) {
-        // On creation, content is already set
+    func updateNSView(_ tv: NoteTextView, context: Context) {
+        context.coordinator.beginEdit = beginEdit
+        context.coordinator.createNewBelow = createNewBelow
+        context.coordinator.save = save
+        context.coordinator.deleteEmpty = deleteEmpty
+        context.coordinator.isEditingBinding = $isEditing
+
+        if isEditing {
+            if !tv.isEditable {
+                tv.isEditable = true
+                tv.isSelectable = true
+            }
+            if let window = tv.window, window.firstResponder !== tv {
+                DispatchQueue.main.async {
+                    window.makeFirstResponder(tv)
+                }
+            }
+        } else {
+            tv.isEditable = false
+            tv.isSelectable = false
+            tv.window?.makeFirstResponder(nil)
+        }
     }
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator()
-    }
+    // MARK: - Coordinator
 
     class Coordinator: NSObject, NSTextViewDelegate {
-        weak var textView: NSTextView?
-        var onBlur: (() -> Void)?
-        var onEnter: (() -> Void)?
-        var onDeleteEmpty: (() -> Void)?
-        var textBinding: Binding<String>?
+        weak var textView: NoteTextView?
+        var beginEdit: (() -> Void)?
+        var createNewBelow: (() -> Void)?
+        var save: ((String) -> Void)?
+        var deleteEmpty: (() -> Void)?
+        var isEditingBinding: Binding<Bool>?
+        var onSingleClick: (() -> Void)?
+
+        // MARK: - Enter and Delete key handling
 
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-                // Check for Shift+Return
                 if let event = NSApp.currentEvent, event.modifierFlags.contains(.shift) {
-                    return false  // line break
+                    return false  // Shift+Return → line break within note
                 }
-                // Enter key — create new note below
-                onEnter?()
+                // Enter → save current, create new note below
+                saveContent(textView)
+                createNewBelow?()
                 return true
             }
             if commandSelector == #selector(NSResponder.deleteBackward(_:)) {
                 if textView.string.isEmpty {
-                    onDeleteEmpty?()
+                    deleteEmpty?()
                     return true
                 }
             }
             return false
         }
 
+        // MARK: - Focus events
+
+        func textDidBeginEditing(_ notification: Notification) {
+            // Fired when NSTextView becomes first responder
+            isEditingBinding?.wrappedValue = true
+        }
+
         func textDidEndEditing(_ notification: Notification) {
-            // Capture the text content as HTML
-            guard let tv = textView else { return }
+            saveContent(notification.object as? NSTextView ?? textView)
+            isEditingBinding?.wrappedValue = false
+        }
+
+        // MARK: - Helpers
+
+        private func saveContent(_ tv: NSTextView?) {
+            guard let tv = tv ?? textView else { return }
+            let html: String
             if let attrStr = tv.textStorage, attrStr.length > 0 {
                 let range = NSRange(location: 0, length: attrStr.length)
                 if let htmlData = try? attrStr.data(from: range,
                     documentAttributes: [.documentType: NSAttributedString.DocumentType.html]) {
-                    let html = String(data: htmlData, encoding: .utf8) ?? tv.string
-                    textBinding?.wrappedValue = html
+                    html = String(data: htmlData, encoding: .utf8) ?? tv.string
                 } else {
-                    textBinding?.wrappedValue = tv.string
+                    html = tv.string
                 }
             } else {
-                textBinding?.wrappedValue = tv.string
+                html = tv.string
             }
-            onBlur?()
+            save?(html)
         }
     }
 }
 
-// MARK: - HTML Attributed String Display
+// MARK: - NoteTextView — custom NSTextView for click handling
 
-struct AttributedTextDisplay: View {
-    let html: String
+class NoteTextView: NSTextView {
+    var singleClickHandler: (() -> Void)?
 
-    var body: some View {
-        if let data = html.data(using: .utf8),
-           let attrStr = try? NSAttributedString(data: data,
-                options: [.documentType: NSAttributedString.DocumentType.html],
-                documentAttributes: nil) {
-            Text(AttributedString(attrStr))
-                .font(.inter(size: AppTypography.body))
-                .foregroundColor(.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-        } else {
-            Text(html)
-                .font(.inter(size: AppTypography.body))
-                .foregroundColor(.textPrimary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount >= 2 {
+            // Double-click: enable editing (word selection is native NSTextView behavior)
+            if !isEditable {
+                isEditable = true
+                isSelectable = true
+            }
+            window?.makeFirstResponder(self)
+            super.mouseDown(with: event)
+            return
         }
+
+        // Single click: enable editing and become first responder
+        if !isEditable {
+            singleClickHandler?()
+            isEditable = true
+            isSelectable = true
+        }
+        window?.makeFirstResponder(self)
+        super.mouseDown(with: event)
     }
 }

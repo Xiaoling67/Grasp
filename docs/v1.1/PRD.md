@@ -29,8 +29,8 @@ Grasp is a next-generation AI note-taking assistant for live lectures and meetin
 | Area | v1.0 (shipped) | v1.1-r1 (failed — shipped to Founder) | v1.1-r2 (THIS — Founder's requirements) |
 |------|----------------|----------------------------------------|------------------------------------------|
 | **Layout** | Side-by-side (transcript \| notes) with bottom panel tabs | 2×2 grid layout (65/35 vertical, 55/45 horizontal). Horizontal divider **fixed**. | 2×2 grid layout. **ALL dividers draggable** — vertical AND horizontal. User freely resizes all 4 quadrants. |
-| **Selection popup** | Broken (NSEvent) | Fixed via NotificationCenter with **80ms debounce**. Slow, unresponsive. | **Instant** popup. No debounce. Direct synchronous tracking. Appears immediately on selection. |
-| **AI Notes** | Flat per-seal notes, ≤25 words, level 0/1/2 | **Concept Map** — hierarchical tree with indented bullets, parent/child/depth indentation. **Founder hates it.** | **Apple Notes clone** — smooth scrolling, inline editing, rich text. No tree. No indented bullets. No custom hierarchy. |
+|| **Selection popup** | Broken (NSEvent) | Fixed via NotificationCenter with **80ms debounce**. Slow, unresponsive. | **Instant** popup. **4 consistent buttons** (K, L, Search, Note) — all icon + label or all icon-only. No mixing. Added **Note** button copies to notes. |
+| **AI Notes** | Flat per-seal notes, ≤25 words, level 0/1/2 | **Concept Map** — hierarchical tree with indented bullets, parent/child/depth indentation. **Founder hates it.** | **Apple Notes clone** — click to edit, double-click word select, click empty area to create new note. No conflicting tap gestures. NSTextView responds to clicks immediately. |
 | **Dividers** | Static | Vertical resizable; horizontal fixed 65/35 | **ALL dividers movable** — vertical AND horizontal. 4 freely resizable quadrants. |
 | **UI quality** | Prototype | Prototype with hardcoded hex colors | **Beautiful, polished** — design system, proper spacing, animations, native feel. |
 | Auto Explain | Stateless per block | Student Knowledge Profile (SQLite) | Unchanged from v1.1-r1 |
@@ -73,12 +73,13 @@ The previous implementation used `NotificationCenter.default.addObserver(forName
 - Small vertical gap (4px) between selected text and popup.
 
 **4. Popup content:**
-- Three buttons in a pill-shaped toolbar:
-  - **Search** (AI definition + analogy)
-  - **Save as Knowledge (K)** — saves to SQLite, adds to Knowledge Profile
-  - **Save as Language (L)** — only visible in International mode
-- Buttons use SF Symbols + short labels.
-- Background: `NSVisualEffectView` material (vibrant light) with rounded corners (10px).
+|- **Four buttons** in a pill-shaped toolbar, all with **consistent styling** (all icon + short label, or all icon-only — must be uniform):
+|  - **K** (`bookmark.fill` icon) — saves to SQLite, adds to Knowledge Profile
+|  - **L** (`character.bubble.fill` icon) — only visible in International mode
+|  - **Search** (`magnifyingglass` icon) — AI definition + analogy
+|  - **Note** (`square.and.pencil` icon) — copies selected text directly to notes via `vm.handleCopyToNotes(text:)`
+|- ALL buttons must have identical visual style. If one shows an icon + label, all must show icon + label. If one is icon-only, all must be icon-only. No mixing.
+|- Background: `NSVisualEffectView` material (vibrant light) with rounded corners (10px).
 - Pill shape: compact, floats above content, no blocking of surrounding text.
 
 **5. Dismissal:**
@@ -95,7 +96,8 @@ The previous implementation used `NotificationCenter.default.addObserver(forName
 - [ ] Popup correctly positions above selection (or below if clipped).
 - [ ] Popup dismisses on outside tap, Esc, new selection, or scroll.
 - [ ] Popup uses `NSVisualEffectView` material (vibrant).
-- [ ] Popup buttons (Search / K / L) work correctly.
+- [ ] Popup buttons (Search / K / L / Note) work correctly.
+- [ ] All 4 buttons have consistent visual styling (all icon+label or all icon-only — no mixing).
 
 ---
 
@@ -127,14 +129,16 @@ The Notes panel must behave **IDENTICALLY** to Apple's native Notes app on macOS
 - Smooth scrolling with rubber-banding at edges (native NSScrollView behavior).
 
 **2. Inline editing EXACTLY like Apple Notes:**
-- **Click to edit** — tap anywhere on a note's text content to enter edit mode.
-- Edit in place — no separate text field, no modal, no sheet. The text itself becomes editable.
-- **Rich text support** — bold, italic, underline, strikethrough (via keyboard shortcuts ⌘B, ⌘I, ⌘U).
-- **NSTextView-based** editing, not SwiftUI TextField. Use AppKit's NSTextView for native text editing behavior.
-- **Auto-save on blur** — edits committed when focus leaves the note.
-- **Return/Enter** — creates a new note below (like Notes app creates a new line within the note, but for Grasp: Enter should create a new note entry within the current note block).
-- **Shift+Return** — line break within the same note.
-- **Delete empty note** — if a note becomes empty on blur, remove it (like Notes app removes empty entries).
+|- **Click to edit** — single-click on any note's text content immediately enters edit mode. The NSTextView becomes first responder and shows a blinking cursor at the click location.
+|- **Double-click to edit** — double-clicking a note enters edit mode AND selects the word under the cursor (matching Apple Notes behavior for word selection).
+|- **Click empty area to create** — clicking on an empty/whitespace area in the notes panel (not on any existing note) creates a new blank note at the bottom of the list with the cursor blinking and ready for typing. This matches Apple Notes' behavior of "click anywhere to start typing."
+|- Edit in place — no separate text field, no modal, no sheet. The text itself becomes editable.
+|- **Rich text support** — bold, italic, underline, strikethrough (via keyboard shortcuts ⌘B, ⌘I, ⌘U).
+|- **NSTextView-based** editing, not SwiftUI TextField. Use AppKit's NSTextView for native text editing behavior.
+|- **Auto-save on blur** — edits committed when focus leaves the note.
+|- **Return/Enter** — creates a new note below (like Notes app creates a new line within the note, but for Grasp: Enter should create a new note entry within the current note block).
+|- **Shift+Return** — line break within the same note.
+|- **Delete empty note** — if a note becomes empty on blur, remove it (like Notes app removes empty entries).
 
 **3. AI-generated notes appear as editable rich text blocks:**
 - Each AI note is a rich text block in the flat list.
@@ -164,9 +168,36 @@ The Notes panel must behave **IDENTICALLY** to Apple's native Notes app on macOS
 - On reload, rich text is restored exactly as edited.
 
 **8. Legacy data compatibility (v1.0 flat notes):**
-- Old v1.0 notes are rendered as plain rich text blocks (no hierarchy).
-- The concept map data model is **deleted** — no `ConceptNode`, no `conceptMap`, no tree structures.
-- All notes become a flat array of editable rich text blocks.
+|- Old v1.0 notes are rendered as plain rich text blocks (no hierarchy).
+|- The concept map data model is **deleted** — no `ConceptNode`, no `conceptMap`, no tree structures.
+|- All notes become a flat array of editable rich text blocks.
+
+**9. Tap gesture resolution and NSTextView responsiveness — CRITICAL IMPLEMENTATION NOTES:**
+
+These issues have been observed in the current implementation and must be fixed to achieve Apple Notes-level behavior:
+
+|- **No `onTapGesture` on container VStack/ScrollView:**
+|  - Placing an `.onTapGesture` modifier on the outermost VStack, List, or ScrollView in `NotesPanelView` intercepts ALL click events before they reach the `NSTextView` inside each `NoteRichEditor`. This is the #1 cause of "clicking does nothing."
+|  - Instead, use the native NSTextView click handling. NSTextView automatically handles single-click (move cursor), double-click (select word), and triple-click (select line).
+|  - If a tap gesture is needed for "click empty area → new note," use a **background tap gesture** that only fires when the click does NOT hit any NSTextView. Implement this via `NSViewRepresentable` coordinator hit-testing or by using `NSTextViewDelegate` methods rather than SwiftUI gesture modifiers on the container.
+
+|- **`editingId` state management must trigger edit mode immediately:**
+|  - `editingId` must be set to the note's ID **before** the note's `NoteRichEditor` appears, so the editor can become first responder on the same runloop cycle.
+|  - Use `onAppear` or `NSViewRepresentable.updateNSView` to call `makeFirstResponder()` on the NSTextView when `editingId` matches.
+|  - Do NOT rely on `onTapGesture` + `DispatchQueue.main.asyncAfter` to set `editingId` — this creates a race condition where the NSTextView appears but is not made first responder.
+|  - Test: tapping any note text should immediately show a blinking cursor with zero perceptible delay.
+
+|- **`NoteRichEditor` (NSViewRepresentable) must respond to clicks immediately:**
+|  - Override `mouseDown:` in the wrapped NSTextView or its coordinator to call `makeFirstResponder()` synchronously.
+|  - Ensure `NSTextView.isSelectable = true` and `NSTextView.isEditable = true` are set at init time.
+|  - The NSViewRepresentable must forward click events to the underlying NSTextView without SwiftUI gesture interference.
+|  - Verify: clicking anywhere in a note's visible text area should immediately show a blinking cursor and allow typing.
+
+|- **"+" button creates new blank note with blinking cursor:**
+|  - On "+" tap, immediately create a new `NoteBlock` with empty content and append it to the notes array.
+|  - Set `editingId` to the new note's ID **synchronously** in the same action handler (not after an async delay).
+|  - The new note should appear at the bottom of the list and auto-scroll into view.
+|  - On the next view update, the `NoteRichEditor` for this new note must call `window?.makeFirstResponder(nstextView)` in its `updateNSView` method.
 
 ### What to DELETE from codebase
 - `ConceptNode` struct (data model)
@@ -190,18 +221,23 @@ The Notes panel must behave **IDENTICALLY** to Apple's native Notes app on macOS
 - Proper focus management between notes
 
 ### Acceptance Criteria
-- [ ] Notes panel looks EXACTLY like Apple Notes — flat, white, no bullets, no indent.
-- [ ] Click any note text → instantly editable in place.
-- [ ] Rich text support: ⌘B bold, ⌘I italic, ⌘U underline work inside notes.
-- [ ] Enter creates new note below within the note block.
-- [ ] Shift+Enter creates line break within the same note.
-- [ ] Auto-save on blur — edits persisted to SQLite.
-- [ ] New AI notes slide in with animation.
-- [ ] Blue left border on new AI notes, fades after 5 seconds.
-- [ ] Hover "×" button on each note for deletion.
-- [ ] Smooth scrolling with rubber-banding at edges.
-- [ ] Notes persisted as RTF/HTML (rich text preserved on reload).
-- [ ] All concept map / tree code is removed from the codebase.
+|- [ ] Notes panel looks EXACTLY like Apple Notes — flat, white, no bullets, no indent.
+|- [ ] Click any note text → instantly editable in place (blinking cursor appears immediately).
+|- [ ] Click empty/whitespace area in notes panel → creates new blank note with cursor blinking.
+|- [ ] Double-click any note → enters edit mode AND selects the word under cursor.
+|- [ ] Rich text support: ⌘B bold, ⌘I italic, ⌘U underline work inside notes.
+|- [ ] Enter creates new note below within the note block.
+|- [ ] Shift+Enter creates line break within the same note.
+|- [ ] Auto-save on blur — edits persisted to SQLite.
+|- [ ] New AI notes slide in with animation.
+|- [ ] Blue left border on new AI notes, fades after 5 seconds.
+|- [ ] Hover "×" button on each note for deletion.
+|- [ ] Smooth scrolling with rubber-banding at edges.
+|- [ ] Notes persisted as RTF/HTML (rich text preserved on reload).
+|- [ ] All concept map / tree code is removed from the codebase.
+|- [ ] No `.onTapGesture` on container VStack/ScrollView in NotesPanelView that intercepts NSTextView clicks.
+|- [ ] `editingId` is set synchronously (no `DispatchQueue.main.asyncAfter`) when entering edit mode.
+|- [ ] NSTextView in `NoteRichEditor` responds to mouseDown immediately — no SwiftUI gesture steal.
 
 ---
 
@@ -494,21 +530,27 @@ The UI used hardcoded hex colors everywhere (`#5A5A5A`, `#C0C0C0`, `#E8E8E8`, `#
 
 ## Appendix C: Acceptance Test Script
 
-### Test 1: Selection Popup Speed
+### Test 1: Selection Popup Speed & Consistency
 1. Start a lecture with active transcription.
 2. Select any 2+ characters in the transcript.
 3. **Expected:** Popup appears immediately (no perceptible delay).
 4. Verify no `asyncAfter` or `DispatchQueue` delay in the selection handler.
+5. **Expected:** Popup shows 4 buttons (K, L, Search, Note) with consistent styling — all icon+label or all icon-only, no mixing.
+6. Click the Note button → selected text is copied to a new note in the Notes panel.
 
 ### Test 2: Apple Notes Behavior
 1. Open the Notes panel.
 2. **Expected:** Flat white panel, no bullets, no indentation.
-3. Click on a note → it becomes editable in place.
-4. Type text. Press ⌘B → bold. Press ⌘I → italic.
-5. Press Enter → new note appears below.
-6. Press Shift+Enter → line break within the same note.
-7. Click elsewhere → changes are saved.
-8. Verify RTF/HTML persistence by reloading the lecture.
+3. Click on an empty/whitespace area in the notes panel → **Expected:** A new blank note appears with blinking cursor.
+4. Click on an existing note → **Expected:** It becomes editable in place immediately (blinking cursor).
+5. Double-click an existing note → **Expected:** Edit mode + word under cursor is selected.
+6. Type text. Press ⌘B → bold. Press ⌘I → italic.
+7. Press Enter → new note appears below.
+8. Press Shift+Enter → line break within the same note.
+9. Click elsewhere → changes are saved.
+10. Verify RTF/HTML persistence by reloading the lecture.
+11. Verify no conflicting `.onTapGesture` on the Notes panel container VStack/ScrollView.
+12. Verify `editingId` is set synchronously (no `DispatchQueue.main.asyncAfter` in the click-to-edit path).
 
 ### Test 3: All Dividers Movable
 1. Drag the vertical divider → left/right columns resize.
