@@ -2,9 +2,11 @@
 
 **Personalized Real-Time AI Note-Taking and Learning Assistant**
 
-Grasp is a macOS app for information-dense live sessions such as lectures, meetings, trainings, interviews, and knowledge-sharing conversations. It combines live speech-to-text, AI note generation, proactive concept explanation, and personalized learning memory to help users listen, understand, and take notes at the same time.
+Grasp is a next-generation AI note-taking app. It helps users capture conversations, understand key ideas, and turn spoken information into structured, editable notes in real time.
 
-Unlike post-session summarizers, Grasp works while the session is happening. The goal is not simply to produce a recap afterward, but to help the user and AI co-create a structured, editable note in real time.
+Unlike traditional note-taking tools or post-session summarizers, Grasp works while the conversation is happening. The goal is not simply to produce a recap afterward, but to help the user and AI co-create a structured, editable note in real time.
+
+Grasp can be used across everyday meetings, lectures, interviews, trainings, research discussions, and knowledge-sharing conversations. It is especially valuable in information-dense live sessions where users need to follow the discussion, understand unfamiliar concepts, and preserve high-quality notes without losing focus.
 
 ## Why Grasp
 
