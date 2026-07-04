@@ -1,6 +1,6 @@
 # Grasp
 
-> Personalized Real-Time AI Note-Taking and Learning Assistant
+**Personalized Real-Time AI Note-Taking and Learning Assistant**
 
 Grasp is a macOS AI workspace for information-dense live sessions such as lectures, meetings, trainings, interviews, and knowledge-sharing conversations. It combines live speech-to-text, AI note generation, proactive concept explanation, and personalized learning memory to help users listen, understand, and take notes at the same time.
 
