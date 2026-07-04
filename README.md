@@ -1,301 +1,185 @@
 # Grasp
 
-**Personalized Real-Time AI Note-Taking and Learning Assistant**
+> Personalized Real-Time AI Note-Taking and Learning Assistant
 
-Grasp is a macOS app for real-time learning and knowledge work. It is designed for people who need to listen, understand, and take notes at the same time in information-dense live sessions such as lectures, meetings, trainings, interviews, and knowledge-sharing conversations.
+Grasp is a macOS AI workspace for live learning and knowledge work. It helps users listen, understand, and take notes at the same time during information-dense sessions such as lectures, meetings, trainings, interviews, and knowledge-sharing conversations.
 
-Grasp is not a post-session summarizer. It is a real-time AI note-taking and learning workspace where the user and AI collaborate while the session is happening.
+Unlike post-session summarizers, Grasp is designed to work while the session is happening. The goal is not simply to produce a recap afterward, but to help the user and AI co-create a structured, editable note in real time.
 
-## Product Positioning
+## Overview
 
-Grasp is the next-generation AI note app: not a tool that summarizes after the meeting, but a tool that helps the user and AI finish the note during the lecture or meeting, so there is little editing left afterward.
+Grasp combines live speech-to-text, AI note generation, proactive concept explanation, and personalized learning memory into one desktop workspace.
 
-v1.3 updates the product positioning from a "macOS classroom AI assistant" to a broader **Personalized Real-Time AI Note-Taking and Learning Assistant**:
+It is built for moments where the user cannot easily pause, replay, or fully focus on writing: a fast lecture, a technical meeting, a dense product review, or a conversation in a second language. Grasp captures the live transcript, turns meaningful segments into structured notes, explains unfamiliar concepts, and gradually learns how the user prefers to write and understand information.
 
-- It covers classrooms, meetings, trainings, interviews, and knowledge-sharing sessions.
-- It keeps International Mode only as a language-accessibility scenario capability.
-- It treats note-taking and learning as one workflow: capture what matters, structure it, edit it, and explain what the user does not understand.
+## Why Grasp
 
-## Why Grasp Is Not Another Granola
+Most AI note tools follow a post-session summary model: they record a meeting or lecture, then generate a polished recap after it ends. That approach is useful, but it has several limitations:
 
-Granola and similar products focus on post-meeting summaries. They listen during the session and generate a recap after it ends.
+- Important wording, examples, or context can be silently compressed or lost.
+- Users often do not spend time carefully editing long AI summaries after the session.
+- Similar sessions tend to produce generic notes if the AI has no structure to follow.
+- The AI usually does not learn the user's preferred note style or knowledge gaps.
+- The final note still needs cleanup after the session.
 
-That model has structural problems:
+Grasp takes a different approach:
 
-- **Information can be silently lost or rewritten.** The AI does not know which exact wording, example, or point the user wanted to preserve.
-- **Users usually do not refine long AI summaries afterward.** If the recap is slightly wrong, the error often stays in the final note.
-- **Similar meetings produce similar notes.** Without a predefined structure, the AI falls back to generic summary templates.
-- **There is no memory.** Each generation is mostly stateless; the AI does not become meaningfully better at writing notes for this user.
-- **The note is not finished during the session.** The user still needs to reread, reorganize, and repair it later.
+- **Real-time collaboration:** notes are generated during the session, close to the moment the information appears.
+- **Human-AI co-writing:** users can edit, guide, and refine notes while AI continues assisting.
+- **Structure-first generation:** notes can follow slides or user-defined frameworks instead of generic summaries.
+- **Learning support:** Grasp explains unfamiliar terms and adapts to what the user already knows.
+- **Personalization:** accepted edits, note structure, detail level, and knowledge history become signals for future outputs.
 
-Grasp is based on five principles:
+## Core Features
 
-1. **Real-time collaborative generation** - notes reflect the user's live intent, not only an after-the-fact reconstruction.
-2. **Human + AI co-writing** - the user can guide structure, emphasize points, preserve original wording, and edit freely.
-3. **Structure before generation** - notes are generated into slides or user-defined templates instead of a generic recap.
-4. **Memory** - Grasp learns the user's note style, detail level, terminology, and known concepts over time.
-5. **Session ends with a usable note** - the goal is to finish the note during the session, not create more cleanup work afterward.
+### Real-Time Transcription
 
-## Target Users
+Grasp captures live audio and converts speech into a running transcript. The transcript is segmented into meaningful blocks so downstream AI features can operate on coherent units rather than isolated sentences.
 
-Grasp is for anyone in a real-time, information-dense setting where listening, understanding, and note-taking compete for attention.
+### AI Notes
 
-Primary users:
+Grasp generates structured notes from live transcript blocks and inserts them into an editable note document. The Notes panel is designed as a continuous writing surface, closer to a native notes app than a chat feed.
 
-- Students in high-density STEM, business, law, or humanities courses.
-- Professionals in meetings, internal trainings, knowledge-sharing sessions, product reviews, customer interviews, or investment discussions.
-- International students or non-native speakers in English lectures or meetings.
+### Human-AI Collaborative Editing
 
-Non-goals for v1.3:
+Users can freely edit AI-generated notes during the session. Grasp treats user edits as intentional and does not overwrite them with later AI output.
 
-- Not for passive recorded-video learning where users can pause and replay freely.
-- Not for users who only want a post-session summary and do not care about the note-taking process.
-- Not for multiplayer collaborative note-taking.
-- Not for mobile, offline mode, or vector-database-based memory in this version.
+### Auto Explain
 
-## Core Capabilities
+Grasp proactively detects unfamiliar or important concepts from the live session and generates short explanations. The goal is to reduce comprehension gaps while the user is still listening.
 
-### I. AI Note-taking
+### Highlight-to-Explain
 
-| Capability | Status | Meaning |
-|---|---|---|
-| Real-Time AI Note Generation | Implemented | Sealed transcript blocks trigger AI note generation during the session. |
-| Human + AI Collaborative Editing | Implemented | Users can edit notes during the session; AI does not overwrite user edits. |
-| Structured Note Generation: Slide-driven | Implemented | Uploaded slides can guide note structure. |
-| Structured Note Generation: Template-driven | v1.3 new | Users can handwrite, save, or upload a custom note structure; AI fills the right section. |
-| Personalized Memory | Partially implemented, expanded in v1.3 | Current note style guide exists; v1.3 adds draft-vs-edit and inline-edit signals. |
-| Human + AI Hybrid Notes | Product result | Final notes differ by user because structure, edits, memory, and AI output interact. |
-| Inline AI Editing | v1.3 new | Select part of a note, ask AI to rewrite only that selection, then replace it if accepted. |
+Users can select text from the transcript and ask Grasp for an immediate explanation. This supports fast clarification without leaving the live workspace.
 
-### II. AI Learning Assistant
+### Personalized Learning Memory
 
-| Capability | Status | Meaning |
-|---|---|---|
-| Proactive AI Explanation | Implemented | Auto Explain detects unfamiliar concepts and explains them during the live session. |
-| Highlight-to-Explain | Implemented | Select text in the transcript and stream a definition + analogy. |
-| Personalized Knowledge Profile | Implemented | Grasp tracks known concepts so it can skip explanations the user does not need. |
+Grasp keeps a local profile of the user's known concepts and note preferences. Over time, this helps the assistant skip what the user already understands and focus on what needs explanation.
 
-## v1.3 Scope
+### Template-Based Note Generation
 
-v1.3 does two things:
+For sessions without slides, users can provide a custom note framework such as a customer interview template, VC pitch evaluation structure, or product review checklist. Grasp uses that structure to organize live notes into the right sections.
 
-1. **Re-align the product narrative** from "classroom assistant" to "Personalized Real-Time AI Note-Taking and Learning Assistant" for real-time knowledge work.
-2. **Add the two missing vision capabilities** from the product concept:
-   - Template-driven Notes
-   - Inline AI Editing
+### Review and Export
 
-Existing v1.1-r3 capabilities such as real-time notes, Apple Notes-style editing, slide-driven notes, Auto Explain, Highlight-to-Explain, and Knowledge Profile remain the foundation.
+Past sessions can be reviewed with transcript, notes, saved items, and search history. Notes can be exported for later study or sharing.
 
-## Template-Driven Notes
+## Product Experience
 
-Problem: Many important sessions do not have slides. A VC pitch review, customer interview, product review, or internal training may still need structured notes, but the structure comes from the user's own framework.
-
-v1.3 behavior:
-
-- New Session offers `Upload Slides`, `Use a Template`, or `None` as mutually exclusive structure sources.
-- Users can quickly type sections line by line, optionally with guidance.
-- Example:
-
-```text
-Market: TAM/SAM/SOM, growth, market dynamics
-Team: founder background, execution ability, hiring gaps
-Product: core workflow, differentiation, adoption friction
-Business Model: pricing, sales motion, margins
-Competition: direct and indirect alternatives
-```
-
-- At session start, the Notes document immediately lays out all sections.
-- Each AI-generated note is inserted under the best-matching section.
-- If no section matches, the note goes to an `Other` section rather than being lost.
-- P1 adds saved reusable templates and uploaded document-to-template parsing.
-
-Data model direction:
-
-```swift
-struct TemplateSection: Codable {
-    var index: Int
-    var title: String
-    var guidance: String
-}
-```
-
-The template path reuses the existing slide-driven pipeline concept: define a structure first, then route live notes into that structure.
-
-## Inline AI Editing
-
-Problem: Today, users can edit the whole Notes document manually, but there is no AI editing interaction inside the Notes panel itself. Transcript selection has a popup, but note selection does not.
-
-v1.3 behavior:
-
-- Select at least 2 characters inside the live Notes document.
-- An instant `Edit with AI` pill appears above the selection.
-- Expanding it opens a card with:
-  - selected text preview
-  - Rewrite
-  - Expand
-  - Shorten
-  - Clarify
-  - Change tone
-  - free-form instruction input
-  - streaming output
-  - Replace / Discard actions
-- Replace only changes the original selected range.
-- The rest of the document must remain byte-for-byte unchanged.
-- After Replace, the new text stays selected so the user can continue editing.
-- Every accepted replacement feeds `(selectedText, finalText, instruction)` into the style guide update logic.
-
-This is not full-document regeneration. It is local, precise, user-approved AI editing.
-
-## Personalized Memory
-
-Current state:
-
-- Grasp has a local `noteStyleGuide`.
-- It is inferred from the final note text using heuristics such as detail level, outline depth, and table usage.
-- It is saved locally and passed into future AI note and summary prompts.
-
-v1.3 extension:
-
-- Inline AI Editing creates high-quality edit pairs: selected text -> accepted replacement.
-- These pairs are stronger signals than passive document analysis.
-- Repeated terminology changes should become terminology preferences.
-- Future notes should reflect the user's accepted edits over time.
-
-## Current Live Workspace
-
-The current app uses a four-quadrant live workspace:
+The main workspace is organized around live capture, note creation, explanation, and retrieval:
 
 ```text
 ┌───────────────────────┬───────────────────────┐
 │ Transcript             │ AI Notes              │
-│ real-time STT          │ live editable document│
+│ live speech-to-text    │ editable live notes   │
 ├───────────────────────┼───────────────────────┤
 │ Auto Explain           │ Save / Search         │
-│ proactive explanation  │ highlight workflows   │
+│ proactive explanation  │ saved context         │
 └───────────────────────┴───────────────────────┘
 ```
 
-Current workspace behavior:
+The layout is built for focused live use:
 
-- Vertical and horizontal dividers are draggable.
-- Cursor changes to native resize arrows on divider hover.
-- AI Notes uses one continuous `NSTextView` inside `NSScrollView`.
-- Content surfaces are pure white.
-- Grasp blue system:
-  - Primary blue: `#2384E8`
-  - Soft blue fill: `#EAF5FF`
-  - Soft blue border: `#CFEAFF`
+- Resizable panels for different workflows.
+- A continuous AI Notes editor.
+- Selection-based actions for fast explanation and note creation.
+- A restrained desktop interface designed for long working sessions.
 
-## Technical Architecture
+## How It Works
 
-| Layer | Technology |
-|---|---|
-| Platform | macOS 14+, Swift, SwiftUI, AppKit |
-| Editor | Native `NSTextView` + `NSScrollView` |
-| Audio capture | `AVAudioEngine` |
-| STT | Deepgram Nova-3 |
-| LLM | DeepSeek Chat |
-| Translation | Qwen-MT with DeepSeek fallback |
-| Storage | SQLite |
-| Project generation | XcodeGen |
+1. Grasp captures live audio from the session.
+2. Speech is converted into a real-time transcript.
+3. Transcript text is segmented into meaningful blocks.
+4. AI turns each block into structured notes.
+5. Notes are inserted into the live editable document.
+6. Auto Explain detects concepts the user may not understand.
+7. User edits and preferences update local personalization signals.
+8. The session ends with a usable note, not just raw transcript data.
+
+## Architecture
+
+Grasp is organized as a native macOS app with separate layers for capture, transcription, AI generation, editing, explanation, and local persistence.
 
 ```text
-Audio
-  AVAudioEngine
-  -> Deepgram WebSocket STT
-  -> transcript blocks
+Audio Capture
+  -> Speech-to-Text
+  -> Transcript Blocks
 
-Notes
-  sealed transcript block
-  -> DeepSeek generateNoteEntry
-  -> quality / duplicate gate
-  -> editable Notes document
+Transcript Blocks
+  -> AI Note Generation
+  -> Structured Notes Editor
 
-Understanding
-  transcript block or selected text
-  -> concept detection / streaming explanation
-  -> Auto Explain / Highlight-to-Explain / Knowledge Profile
+Transcript / Selection
+  -> Concept Detection
+  -> Auto Explain / Highlight-to-Explain
 
-v1.3 additions
-  TemplateSection
-  + structureType: none / slides / template
-  + streamInlineEdit(selectedText, instruction, documentContext)
-  + inline edit pairs for style memory
+User Edits + Saved Concepts
+  -> Personalization Memory
+  -> Future Notes and Explanations
 ```
 
-## v1.3 P0 Requirements
+Core modules:
 
-| Requirement | Acceptance |
+- **macOS client:** SwiftUI interface with AppKit-backed editing where native text behavior matters.
+- **Speech-to-text layer:** live transcription pipeline for real-time capture.
+- **LLM orchestration layer:** prompt workflows for notes, explanations, search, and editing.
+- **Note generation engine:** converts transcript blocks into structured note entries.
+- **Auto Explain engine:** detects and explains unfamiliar concepts.
+- **Personalization layer:** stores knowledge profile and note style signals.
+- **Local persistence:** saves lectures, transcript blocks, notes, searches, and settings.
+
+## Tech Stack
+
+| Area | Technology |
 |---|---|
-| Handwritten templates | Generate `[TemplateSection]` locally without network calls. |
-| Template sections appear at session start | Start Recording immediately inserts all section titles into Notes. |
-| AI notes route into matching sections | Unmatched content goes to `Other`. |
-| Notes selection shows `Edit with AI` | Appears within one frame, no debounce. |
-| Inline edit card | Includes 5 actions, free-form input, streaming preview. |
-| Replace only original selection | No other part of the document changes. |
-| Inline edits update style guide | Accepted `(selectedText, finalText)` enters style learning. |
+| Platform | macOS |
+| UI | SwiftUI + AppKit |
+| Editor | `NSTextView` + `NSScrollView` |
+| Audio | `AVAudioEngine` |
+| Speech-to-text | Deepgram Nova-3 |
+| LLM | DeepSeek Chat |
+| Translation | Qwen-MT with fallback support |
+| Storage | SQLite |
+| Project tooling | Xcode / XcodeGen |
 
-## v1.3 P1 Requirements
-
-| Requirement | Acceptance |
-|---|---|
-| Save reusable templates | Local `templates` table and selectable saved templates. |
-| Upload document as template | Parse PDF/Word/plain text into `TemplateSection` list. |
-| Change tone presets | Formal, Casual, Concise-professional. |
-| Terminology preference tracking | Repeated replacements influence future prompts. |
-| README / root PRD rewrite | Product no longer reads as only a classroom assistant. |
-
-## Quick Start
+## Setup
 
 ```bash
-brew install xcodegen
 git clone https://github.com/Xiaoling67/Grasp.git
 cd Grasp
 cp Grasp/Services/Secrets.example.swift Grasp/Services/Secrets.swift
-# Add API keys to Secrets.swift
+```
+
+Add the required API keys to `Grasp/Services/Secrets.swift`, then generate and open the Xcode project:
+
+```bash
 xcodegen generate
 open Grasp.xcodeproj
 ```
 
 Requirements:
 
-- macOS 14.0+
-- Xcode 16.0+
-- Microphone permission
-- API keys for enabled model providers
+- macOS 14+
+- Xcode
+- XcodeGen
+- API keys for the configured STT and LLM providers
 
-## Verification
+## Roadmap
 
-Current v1.1-r3 behavior can be checked with:
+Planned directions include:
 
-```bash
-bash scripts/verify-v1.1-r3.sh
-```
+- More adaptive note style learning from user edits.
+- Better template control for different learning and work scenarios.
+- Inline AI editing inside the notes editor.
+- Deeper knowledge profile and concept memory.
+- Higher-quality export formats.
+- Multimodal notes with tables, images, and richer structure.
+- International learning support for non-native speakers.
 
-The script verifies the current live workspace, AI Notes behavior, draggable panels, note formatting, settings persistence, duplicate gating, and macOS build success.
+## Project Status
 
-## Repository Structure
+Grasp is an active AI product prototype under development.
 
-```text
-Grasp/
-  Services/       STT, LLM, translation, audio, database, memory
-  ViewModels/     App state and product workflows
-  Views/          Live workspace, Notes editor, transcript, modals, pages
+## Author
 
-docs/
-  v1.3/           Product vision and next major requirements
-  v1.1/           Current implementation details and QA records
-
-scripts/
-  verify-v1.1-r3.sh
-```
-
-## Product Documents
-
-- `docs/v1.3/PRD.md` - the source of truth for the current product vision.
-- `docs/v1.1/PRD.md` - implementation details for the current live workspace and Apple Notes-style editor.
-- `docs/v1.1/SPEC.md` - supporting specs for existing capabilities.
-
-## License
-
-Proprietary. All rights reserved.
+Built by [Xiaoling67](https://github.com/Xiaoling67) as an AI Builder project exploring real-time AI note-taking, personalized learning assistance, and human-AI collaborative knowledge work.
