@@ -8,11 +8,17 @@ final class DeepgramService: NSObject {
     private var session: URLSession?
     private var timer: Timer?
     private var pending = [Data]()
+    private var lastSampleRate = 16_000.0
+    private var lastKeywords = [String]()
+    private var shouldReconnect = false
+    private var isReconnecting = false
     private(set) var isConnected = false
     var onFinal: ((String) -> Void)?; var onInterim: ((String) -> Void)?; var onEnd: (() -> Void)?; var onStatus: ((String) -> Void)?
 
     func connect(sr: Double, keywords: [String] = []) {
-        isConnected = false; pending.removeAll()
+        lastSampleRate = sr; lastKeywords = keywords; shouldReconnect = true
+        isConnected = false
+        timer?.invalidate(); timer = nil
         var c = URLComponents(); c.scheme = "wss"; c.host = "api.deepgram.com"; c.path = "/v1/listen"
         var items: [URLQueryItem] = [
             URLQueryItem(name: "model", value: "nova-3"),
@@ -37,15 +43,24 @@ final class DeepgramService: NSObject {
     }
 
     func sendAudio(_ d: Data) {
+        if !Thread.isMainThread {
+            DispatchQueue.main.async { [weak self] in self?.sendAudio(d) }
+            return
+        }
         if isConnected { task?.send(.data(d)) { _ in } }
-        else if pending.count < 20 { pending.append(d) }
+        else {
+            pending.append(d)
+            if pending.count > 200 { pending.removeFirst(pending.count - 200) }
+        }
     }
 
     func disconnect() {
-        timer?.invalidate(); timer = nil; isConnected = false
+        shouldReconnect = false; isReconnecting = false; timer?.invalidate(); timer = nil; isConnected = false
+        pending.removeAll()
         task?.send(.string(#"{"type":"CloseStream"}"#)) { _ in }
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil; session?.invalidateAndCancel(); session = nil
+        onStatus?("disconnected")
     }
 
     private func keepAlive() {
@@ -54,15 +69,30 @@ final class DeepgramService: NSObject {
         }
     }
 
-    private func recv() {
-        task?.receive { [weak self] r in
-            guard let self, self.isConnected else { return }
+    private func recv(_ currentTask: URLSessionWebSocketTask) {
+        currentTask.receive { [weak self] r in
+            guard let self, self.task === currentTask, self.isConnected else { return }
             switch r {
             case .success(let m):
                 if case .string(let t) = m { self.handle(t) }
-                self.recv()
-            case .failure: self.isConnected = false; self.timer?.invalidate()
+                self.recv(currentTask)
+            case .failure: self.reconnect(from: currentTask)
             }
+        }
+    }
+
+    private func reconnect(from closedTask: URLSessionWebSocketTask) {
+        guard task === closedTask else { return }
+        guard shouldReconnect, !isReconnecting else { return }
+        isReconnecting = true
+        isConnected = false; timer?.invalidate(); timer = nil
+        task?.cancel(with: .goingAway, reason: nil)
+        session?.invalidateAndCancel()
+        task = nil; session = nil
+        onStatus?("reconnecting")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self, self.shouldReconnect else { return }
+            self.connect(sr: self.lastSampleRate, keywords: self.lastKeywords)
         }
     }
 
@@ -79,12 +109,21 @@ final class DeepgramService: NSObject {
 
 extension DeepgramService: URLSessionWebSocketDelegate {
     func urlSession(_ s: URLSession, webSocketTask t: URLSessionWebSocketTask, didOpenWithProtocol p: String?) {
-        isConnected = true; keepAlive(); recv()
+        guard task === t else { return }
+        isConnected = true; isReconnecting = false; keepAlive(); recv(t)
         onStatus?("connected")
         for d in pending { t.send(.data(d)) { _ in } }
         pending.removeAll()
     }
     func urlSession(_ s: URLSession, webSocketTask t: URLSessionWebSocketTask, didCloseWith c: URLSessionWebSocketTask.CloseCode, reason: Data?) {
-        isConnected = false; timer?.invalidate()
+        reconnect(from: t)
+    }
+    // Handshake/connection-level failures (DNS hiccup, TLS drop, brief network loss during
+    // reconnect) surface here instead of didCloseWith, since the socket never successfully
+    // opened. Without this, such a failure left isConnected=false forever with nothing
+    // scheduling another attempt — transcription would silently never resume.
+    func urlSession(_ s: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard let ws = task as? URLSessionWebSocketTask, error != nil else { return }
+        reconnect(from: ws)
     }
 }
