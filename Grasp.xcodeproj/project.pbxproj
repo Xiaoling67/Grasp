@@ -10,6 +10,38 @@
 		0692007930C43A8522271B4E /* SearchCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C410AB07F2D52E455333A8 /* SearchCardView.swift */; };
 		08023323270DA002AE73D0EF /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B484BCA40ED47A28CA84C8D /* libsqlite3.tbd */; };
 		92D22A2ED1E241C48424EE04 /* ColdCallCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2E73417689C405B85B76EE9 /* ColdCallCardView.swift */; };
+		59341743EC24473896CD2A2A /* NotesDocumentEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E02EAB5A596470ABF46AB97 /* NotesDocumentEditorView.swift */; };
+		8A6B2A765BC24E5DB7056C04 /* NotesDocumentFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55F06772830440C8BA8F2E7 /* NotesDocumentFormatter.swift */; };
+		77558C5462D34D8599D046AF /* NotesTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C49E174D720B41649B30060A /* NotesTextView.swift */; };
+		13242DA2D2DA4739972CD98F /* AppViewModel+Onboarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24F1BE787D4D4095A1AD6729 /* AppViewModel+Onboarding.swift */; };
+		2A43E6CD8C184F959C23D84B /* AppViewModel+Lecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C62FE0EB524C56977D783D /* AppViewModel+Lecture.swift */; };
+		2ED572A0659448A28BC8CE81 /* AppViewModel+Transcript.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B765FFD8A0D4AD89DEF9E3E /* AppViewModel+Transcript.swift */; };
+		6A7C9AA65374471284350740 /* AppViewModel+ColdCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 797407775EA74C55BEB6A6DA /* AppViewModel+ColdCall.swift */; };
+		62FCCE5B495149C4B5FF9187 /* AppViewModel+Notes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8575C0AF54E04AE3860FC6AB /* AppViewModel+Notes.swift */; };
+		52AB4DF8CB24424993A09513 /* AppViewModel+AutoExplain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66B0D23279AA4F96B9867CEC /* AppViewModel+AutoExplain.swift */; };
+		19864961CC3848FA99227834 /* AppViewModel+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40A06977B0D43D097FA0365 /* AppViewModel+Search.swift */; };
+		8588CF5C08F748DEBB6FE7E0 /* AppViewModel+Save.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D75B5B2820D4FDBBFA3C5CD /* AppViewModel+Save.swift */; };
+		F458668C36724F659F260068 /* AppViewModel+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CB1F2358B25433F9F125039 /* AppViewModel+Settings.swift */; };
+		4AC634F7F2E14D4EAD26E29D /* AppViewModel+Tabs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3279D5AAEA58454F921AB552 /* AppViewModel+Tabs.swift */; };
+		2A1F9524A7AE47CBB4B374DD /* DeepSeekService+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B16E9871C5746648B5C7608 /* DeepSeekService+Search.swift */; };
+		7E31660FF78C44FF86475247 /* DeepSeekService+Notes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 319CAFC12A784DC8922A7F5E /* DeepSeekService+Notes.swift */; };
+		7C1209475A434944BAD27C2D /* DeepSeekService+AutoExplain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EEAB41FE5CF411C95A6214A /* DeepSeekService+AutoExplain.swift */; };
+		03F7F4F879634E998FC9DC97 /* DeepSeekService+Slides.swift in Sources */ = {isa = PBXBuildFile; fileRef = E99B4D17E211402B8C43003E /* DeepSeekService+Slides.swift */; };
+		0E4C5C535ABF4E859E83BCA3 /* DeepSeekService+ColdCall.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80270A280DA042F6AE4A2FA3 /* DeepSeekService+ColdCall.swift */; };
+		76FC92324CFC44D491458F27 /* DragHandles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69783440551B46E2B944D065 /* DragHandles.swift */; };
+		4E61AAFCEA1B403FACC8873F /* AutoExplainBottomQuadrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62A53A8F8C784217A34A4B0C /* AutoExplainBottomQuadrant.swift */; };
+		E5F1C62E885244D9BA9132EF /* ContextualBottomQuadrant.swift in Sources */ = {isa = PBXBuildFile; fileRef = C570CBF6D4FA4EC88E76B7EF /* ContextualBottomQuadrant.swift */; };
+		029F2A654593447CA677584D /* PanelHeaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E22FE93A5E2442B6BEFD6AE5 /* PanelHeaderView.swift */; };
+		B832D327CE7847C9B26CC55C /* SettingsPopovers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47F24418B4244DE89DCAE324 /* SettingsPopovers.swift */; };
+		EBD3FB5EAEE2452E8D1158C2 /* DatabaseService+Lectures.swift in Sources */ = {isa = PBXBuildFile; fileRef = F81EA1A675C8434BA1B35524 /* DatabaseService+Lectures.swift */; };
+		BF0F6D2DB48447B692DF8B94 /* DatabaseService+Blocks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 342856915989405BA4268D6D /* DatabaseService+Blocks.swift */; };
+		DA7407741C0140A887B53E00 /* DatabaseService+Saves.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F092F0DEF0491CA5DFDDB7 /* DatabaseService+Saves.swift */; };
+		88192564FF804AE68893B217 /* DatabaseService+Searches.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C5B2D3722CD48CD99DE2738 /* DatabaseService+Searches.swift */; };
+		1618F271EAE54180B710BEED /* DatabaseService+Notes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CD52370F85A4656A5CF6A43 /* DatabaseService+Notes.swift */; };
+		F53C7064AEF249F8B3D35635 /* DatabaseService+Slides.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68CB19F3F75F4A3FAE42D176 /* DatabaseService+Slides.swift */; };
+		E5AE5B84DF334CBB9AB5DC22 /* DatabaseService+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E5A13123854EA08F3825BD /* DatabaseService+Settings.swift */; };
+		1145FECF85724490A3A5BC60 /* DatabaseService+KnowledgeProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF5BFFDA2B9F438BB923A251 /* DatabaseService+KnowledgeProfile.swift */; };
+		04DAD721A9BD45A58664FB0D /* BlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D175E16CA0746A08D4BB1B3 /* BlockView.swift */; };
 		082714160E6902E4E7E70DE7 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5EC98F5FB5E5932CCDD1B61 /* HomeView.swift */; };
 		35681C9D9B91B3DDB0073D0B /* OnboardingModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FE60FDDAA5C43556F1960D /* OnboardingModalView.swift */; };
 		44E1EF416235F972B142D2D6 /* SaveCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBF04FE70C69BB819F716A6F /* SaveCardView.swift */; };
@@ -52,6 +84,38 @@
 		0ED1CAD13FCFBF86CEE416B8 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		1B484BCA40ED47A28CA84C8D /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
 		C2E73417689C405B85B76EE9 /* ColdCallCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColdCallCardView.swift; sourceTree = "<group>"; };
+		3E02EAB5A596470ABF46AB97 /* NotesDocumentEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesDocumentEditorView.swift; sourceTree = "<group>"; };
+		D55F06772830440C8BA8F2E7 /* NotesDocumentFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesDocumentFormatter.swift; sourceTree = "<group>"; };
+		C49E174D720B41649B30060A /* NotesTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesTextView.swift; sourceTree = "<group>"; };
+		24F1BE787D4D4095A1AD6729 /* AppViewModel+Onboarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Onboarding.swift"; sourceTree = "<group>"; };
+		A1C62FE0EB524C56977D783D /* AppViewModel+Lecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Lecture.swift"; sourceTree = "<group>"; };
+		4B765FFD8A0D4AD89DEF9E3E /* AppViewModel+Transcript.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Transcript.swift"; sourceTree = "<group>"; };
+		797407775EA74C55BEB6A6DA /* AppViewModel+ColdCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+ColdCall.swift"; sourceTree = "<group>"; };
+		8575C0AF54E04AE3860FC6AB /* AppViewModel+Notes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Notes.swift"; sourceTree = "<group>"; };
+		66B0D23279AA4F96B9867CEC /* AppViewModel+AutoExplain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+AutoExplain.swift"; sourceTree = "<group>"; };
+		B40A06977B0D43D097FA0365 /* AppViewModel+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Search.swift"; sourceTree = "<group>"; };
+		2D75B5B2820D4FDBBFA3C5CD /* AppViewModel+Save.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Save.swift"; sourceTree = "<group>"; };
+		1CB1F2358B25433F9F125039 /* AppViewModel+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Settings.swift"; sourceTree = "<group>"; };
+		3279D5AAEA58454F921AB552 /* AppViewModel+Tabs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppViewModel+Tabs.swift"; sourceTree = "<group>"; };
+		6B16E9871C5746648B5C7608 /* DeepSeekService+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeepSeekService+Search.swift"; sourceTree = "<group>"; };
+		319CAFC12A784DC8922A7F5E /* DeepSeekService+Notes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeepSeekService+Notes.swift"; sourceTree = "<group>"; };
+		9EEAB41FE5CF411C95A6214A /* DeepSeekService+AutoExplain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeepSeekService+AutoExplain.swift"; sourceTree = "<group>"; };
+		E99B4D17E211402B8C43003E /* DeepSeekService+Slides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeepSeekService+Slides.swift"; sourceTree = "<group>"; };
+		80270A280DA042F6AE4A2FA3 /* DeepSeekService+ColdCall.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DeepSeekService+ColdCall.swift"; sourceTree = "<group>"; };
+		69783440551B46E2B944D065 /* DragHandles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DragHandles.swift; sourceTree = "<group>"; };
+		62A53A8F8C784217A34A4B0C /* AutoExplainBottomQuadrant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoExplainBottomQuadrant.swift; sourceTree = "<group>"; };
+		C570CBF6D4FA4EC88E76B7EF /* ContextualBottomQuadrant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextualBottomQuadrant.swift; sourceTree = "<group>"; };
+		E22FE93A5E2442B6BEFD6AE5 /* PanelHeaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelHeaderView.swift; sourceTree = "<group>"; };
+		47F24418B4244DE89DCAE324 /* SettingsPopovers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsPopovers.swift; sourceTree = "<group>"; };
+		F81EA1A675C8434BA1B35524 /* DatabaseService+Lectures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseService+Lectures.swift"; sourceTree = "<group>"; };
+		342856915989405BA4268D6D /* DatabaseService+Blocks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseService+Blocks.swift"; sourceTree = "<group>"; };
+		C7F092F0DEF0491CA5DFDDB7 /* DatabaseService+Saves.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseService+Saves.swift"; sourceTree = "<group>"; };
+		8C5B2D3722CD48CD99DE2738 /* DatabaseService+Searches.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseService+Searches.swift"; sourceTree = "<group>"; };
+		3CD52370F85A4656A5CF6A43 /* DatabaseService+Notes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseService+Notes.swift"; sourceTree = "<group>"; };
+		68CB19F3F75F4A3FAE42D176 /* DatabaseService+Slides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseService+Slides.swift"; sourceTree = "<group>"; };
+		D1E5A13123854EA08F3825BD /* DatabaseService+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseService+Settings.swift"; sourceTree = "<group>"; };
+		EF5BFFDA2B9F438BB923A251 /* DatabaseService+KnowledgeProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DatabaseService+KnowledgeProfile.swift"; sourceTree = "<group>"; };
+		8D175E16CA0746A08D4BB1B3 /* BlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlockView.swift; sourceTree = "<group>"; };
 		1C23E2649D6DA06744EEF78F /* SlideParserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideParserService.swift; sourceTree = "<group>"; };
 		21FE60FDDAA5C43556F1960D /* OnboardingModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModalView.swift; sourceTree = "<group>"; };
 		2814E5CAA92DA330A56E631B /* SearchHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchHistoryView.swift; sourceTree = "<group>"; };
@@ -101,6 +165,11 @@
 			isa = PBXGroup;
 			children = (
 				D663CDDC59EB3533525F98A1 /* LiveTabView.swift */,
+				69783440551B46E2B944D065 /* DragHandles.swift */,
+				62A53A8F8C784217A34A4B0C /* AutoExplainBottomQuadrant.swift */,
+				C570CBF6D4FA4EC88E76B7EF /* ContextualBottomQuadrant.swift */,
+				E22FE93A5E2442B6BEFD6AE5 /* PanelHeaderView.swift */,
+				47F24418B4244DE89DCAE324 /* SettingsPopovers.swift */,
 				59EEA4BAAB4570D46E354920 /* SidebarView.swift */,
 				9276D13D80BA6C11947D6A94 /* TopBarView.swift */,
 			);
@@ -120,6 +189,9 @@
 			isa = PBXGroup;
 			children = (
 				502BEE3F270F672D6DF4E66E /* NotesPanelView.swift */,
+				3E02EAB5A596470ABF46AB97 /* NotesDocumentEditorView.swift */,
+				D55F06772830440C8BA8F2E7 /* NotesDocumentFormatter.swift */,
+				C49E174D720B41649B30060A /* NotesTextView.swift */,
 			);
 			path = Notes;
 			sourceTree = "<group>";
@@ -141,6 +213,16 @@
 			isa = PBXGroup;
 			children = (
 				0184F423551118EAACC20E47 /* AppViewModel.swift */,
+				24F1BE787D4D4095A1AD6729 /* AppViewModel+Onboarding.swift */,
+				A1C62FE0EB524C56977D783D /* AppViewModel+Lecture.swift */,
+				4B765FFD8A0D4AD89DEF9E3E /* AppViewModel+Transcript.swift */,
+				797407775EA74C55BEB6A6DA /* AppViewModel+ColdCall.swift */,
+				8575C0AF54E04AE3860FC6AB /* AppViewModel+Notes.swift */,
+				66B0D23279AA4F96B9867CEC /* AppViewModel+AutoExplain.swift */,
+				B40A06977B0D43D097FA0365 /* AppViewModel+Search.swift */,
+				2D75B5B2820D4FDBBFA3C5CD /* AppViewModel+Save.swift */,
+				1CB1F2358B25433F9F125039 /* AppViewModel+Settings.swift */,
+				3279D5AAEA58454F921AB552 /* AppViewModel+Tabs.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -226,8 +308,21 @@
 			children = (
 				08A81DB9B416E3CAB90AE28C /* AudioService.swift */,
 				0ED1CAD13FCFBF86CEE416B8 /* DatabaseService.swift */,
+				F81EA1A675C8434BA1B35524 /* DatabaseService+Lectures.swift */,
+				342856915989405BA4268D6D /* DatabaseService+Blocks.swift */,
+				C7F092F0DEF0491CA5DFDDB7 /* DatabaseService+Saves.swift */,
+				8C5B2D3722CD48CD99DE2738 /* DatabaseService+Searches.swift */,
+				3CD52370F85A4656A5CF6A43 /* DatabaseService+Notes.swift */,
+				68CB19F3F75F4A3FAE42D176 /* DatabaseService+Slides.swift */,
+				D1E5A13123854EA08F3825BD /* DatabaseService+Settings.swift */,
+				EF5BFFDA2B9F438BB923A251 /* DatabaseService+KnowledgeProfile.swift */,
 				0ADC10A105A0270D8A27A358 /* DeepgramService.swift */,
 				5FBB86C6CC26191B835E3520 /* DeepSeekService.swift */,
+				6B16E9871C5746648B5C7608 /* DeepSeekService+Search.swift */,
+				319CAFC12A784DC8922A7F5E /* DeepSeekService+Notes.swift */,
+				9EEAB41FE5CF411C95A6214A /* DeepSeekService+AutoExplain.swift */,
+				E99B4D17E211402B8C43003E /* DeepSeekService+Slides.swift */,
+				80270A280DA042F6AE4A2FA3 /* DeepSeekService+ColdCall.swift */,
 				800920B0831D95BFB2022B8D /* MemoryService.swift */,
 				EB6737F9316E1CCECB8BDDDE /* QwenTranslationService.swift */,
 				FCEEFA44DA1BD75E7B0056BC /* Secrets.swift */,
@@ -241,6 +336,7 @@
 			children = (
 				E2C1FDFDDBD47371915E9FA7 /* SelectionPopupView.swift */,
 				08D4ECD99229FFB3103D0C34 /* TranscriptPanelView.swift */,
+				8D175E16CA0746A08D4BB1B3 /* BlockView.swift */,
 			);
 			path = Transcript;
 			sourceTree = "<group>";
@@ -332,13 +428,36 @@
 			buildActionMask = 2147483647;
 			files = (
 				BE641C8474B3A447616E8EDB /* AppViewModel.swift in Sources */,
+				13242DA2D2DA4739972CD98F /* AppViewModel+Onboarding.swift in Sources */,
+				2A43E6CD8C184F959C23D84B /* AppViewModel+Lecture.swift in Sources */,
+				2ED572A0659448A28BC8CE81 /* AppViewModel+Transcript.swift in Sources */,
+				6A7C9AA65374471284350740 /* AppViewModel+ColdCall.swift in Sources */,
+				62FCCE5B495149C4B5FF9187 /* AppViewModel+Notes.swift in Sources */,
+				52AB4DF8CB24424993A09513 /* AppViewModel+AutoExplain.swift in Sources */,
+				19864961CC3848FA99227834 /* AppViewModel+Search.swift in Sources */,
+				8588CF5C08F748DEBB6FE7E0 /* AppViewModel+Save.swift in Sources */,
+				F458668C36724F659F260068 /* AppViewModel+Settings.swift in Sources */,
+				4AC634F7F2E14D4EAD26E29D /* AppViewModel+Tabs.swift in Sources */,
 				5845F04708DE1630244380D3 /* AudioService.swift in Sources */,
 				DAA59D28BD3F5D0949E86AD9 /* AutoExplainCardView.swift in Sources */,
 				D7343C150CF17087B964DE1D /* BottomPanelView.swift in Sources */,
 				92D22A2ED1E241C48424EE04 /* ColdCallCardView.swift in Sources */,
 				93BC6F1BA576EC5A55863AD1 /* Color+Hex.swift in Sources */,
 				7F2C46D97114FA80D9504CD4 /* DatabaseService.swift in Sources */,
+				EBD3FB5EAEE2452E8D1158C2 /* DatabaseService+Lectures.swift in Sources */,
+				BF0F6D2DB48447B692DF8B94 /* DatabaseService+Blocks.swift in Sources */,
+				DA7407741C0140A887B53E00 /* DatabaseService+Saves.swift in Sources */,
+				88192564FF804AE68893B217 /* DatabaseService+Searches.swift in Sources */,
+				1618F271EAE54180B710BEED /* DatabaseService+Notes.swift in Sources */,
+				F53C7064AEF249F8B3D35635 /* DatabaseService+Slides.swift in Sources */,
+				E5AE5B84DF334CBB9AB5DC22 /* DatabaseService+Settings.swift in Sources */,
+				1145FECF85724490A3A5BC60 /* DatabaseService+KnowledgeProfile.swift in Sources */,
 				AE0788C206050AF0AF64B21E /* DeepSeekService.swift in Sources */,
+				2A1F9524A7AE47CBB4B374DD /* DeepSeekService+Search.swift in Sources */,
+				7E31660FF78C44FF86475247 /* DeepSeekService+Notes.swift in Sources */,
+				7C1209475A434944BAD27C2D /* DeepSeekService+AutoExplain.swift in Sources */,
+				03F7F4F879634E998FC9DC97 /* DeepSeekService+Slides.swift in Sources */,
+				0E4C5C535ABF4E859E83BCA3 /* DeepSeekService+ColdCall.swift in Sources */,
 				589C413205D151F3608F78BA /* DeepgramService.swift in Sources */,
 				C86F3AB69AE75474DF2CD180 /* ExportModalView.swift in Sources */,
 				5890E5F3DC55895DFDBE0135 /* GraspApp.swift in Sources */,
@@ -346,10 +465,18 @@
 				977EE7291F5E5706AEA84CF1 /* InterFont.swift in Sources */,
 				B271D50BF1B52041593EE408 /* KnowledgeProfileView.swift in Sources */,
 				935FE6A4996C3F9FC4093C3D /* LiveTabView.swift in Sources */,
+				76FC92324CFC44D491458F27 /* DragHandles.swift in Sources */,
+				4E61AAFCEA1B403FACC8873F /* AutoExplainBottomQuadrant.swift in Sources */,
+				E5F1C62E885244D9BA9132EF /* ContextualBottomQuadrant.swift in Sources */,
+				029F2A654593447CA677584D /* PanelHeaderView.swift in Sources */,
+				B832D327CE7847C9B26CC55C /* SettingsPopovers.swift in Sources */,
 				652C529A2CFB1308E4B30984 /* MemoryService.swift in Sources */,
 				63A84FABB5C1A658B45E7B7D /* Models.swift in Sources */,
 				F1657163AF0BE5F5CCF721AA /* NewLectureModalView.swift in Sources */,
 				AC21EC21E9CF8D790FC4A0A4 /* NotesPanelView.swift in Sources */,
+				59341743EC24473896CD2A2A /* NotesDocumentEditorView.swift in Sources */,
+				8A6B2A765BC24E5DB7056C04 /* NotesDocumentFormatter.swift in Sources */,
+				77558C5462D34D8599D046AF /* NotesTextView.swift in Sources */,
 				35681C9D9B91B3DDB0073D0B /* OnboardingModalView.swift in Sources */,
 				DFDD4739C6211E0F081FB365 /* PastLectureView.swift in Sources */,
 				EB02601CF8A3E7DFC24EC607 /* QwenTranslationService.swift in Sources */,
@@ -365,6 +492,7 @@
 				E2B49B99116F27F9CA98F141 /* ToastView.swift in Sources */,
 				8B4066C16713859A2A1F00E7 /* TopBarView.swift in Sources */,
 				CA61D6C9CB848574D42D44B0 /* TranscriptPanelView.swift in Sources */,
+				04DAD721A9BD45A58664FB0D /* BlockView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
