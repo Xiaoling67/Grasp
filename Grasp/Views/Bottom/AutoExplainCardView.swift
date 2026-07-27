@@ -14,12 +14,14 @@ struct AutoExplainCardView: View {
                 HStack(spacing: 6) {
                     Text("AUTO").font(.inter(size: 9, weight: .bold)).foregroundColor(.white)
                         .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(Color.accentPurple).cornerRadius(3)
+                        .background(Color.pastelPink).cornerRadius(6)
+                        .foregroundColor(Color.textPrimary)
                     Text(term).font(.inter(size: 11, weight: .semibold)).foregroundColor(Color.mediumGray)
                 }
                 Spacer()
                 Button("✕") { vm.dismissAutoExplain() }.buttonStyle(.plain).font(.inter(size: 12)).foregroundColor(Color.mutedGray)
             }.padding(.horizontal, 12).padding(.vertical, 8)
+                .background(Color.warmCream)
                 .overlay(Rectangle().fill(Color.pillBorderGray).frame(height: 0.5), alignment: .bottom)
 
             ScrollView {
@@ -44,8 +46,8 @@ struct AutoExplainCardView: View {
                     .overlay(Rectangle().fill(Color.pillBorderGray).frame(height: 0.5), alignment: .top)
             }
         }
-        .background(Color.white).cornerRadius(8)
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.lightPurpleBg, lineWidth: 1))
+        .background(Color.surfacePrimary).cornerRadius(8)
+        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.pastelPink, lineWidth: 1))
         .shadow(color: .black.opacity(0.06), radius: 8, y: 1)
     }
 

@@ -10,7 +10,7 @@ extension Color {
     }
 }
 
-// MARK: - Design Tokens — v1.1-r2
+// MARK: - Design Tokens — v1.1-r3
 // Centralized design system per PRD §4.
 // Never hardcode hex colors, arbitrary padding, or ad-hoc font sizes.
 
@@ -35,53 +35,67 @@ enum CornerRadius {
 
 // ── Typography ──
 enum AppTypography {
-    static let body:      CGFloat = 13
+    static let body:      CGFloat = 14
     static let caption:   CGFloat = 11
     static let small:     CGFloat = 10
-    static let title:     CGFloat = 14
-    static let lineHeight: CGFloat = 1.4
+    static let title:     CGFloat = 16
+    static let lineHeight: CGFloat = 1.45
 }
 
 // ── Semantic Colors ──
+// Grasp UI blue system:
+// Primary blue: #2384E8. Page/background fills stay pure white (#FFFFFF).
 extension Color {
+    static let appBackground     = Color(hex: "FFFFFF")
+    static let pastelBlue        = Color(hex: "FFFFFF")
+    static let pastelBlueStrong  = Color(hex: "FFFFFF")
+    static let pastelGreen       = Color(hex: "FFFFFF")
+    static let pastelGreenBorder = Color(hex: "9CCBF4")
+    static let pastelYellow      = Color(hex: "FFF4CC")
+    static let pastelYellowBorder = Color(hex: "E8C85C")
+    static let pastelPink        = Color(hex: "FFE8EF")
+    static let pastelPinkBorder  = Color(hex: "F3C0CF")
+    static let pastelLilac       = Color(hex: "F1EAFE")
+    static let warmCream         = Color(hex: "FFFFFF")
+
     static let surfacePrimary    = Color(hex: "FFFFFF")
-    static let surfaceSecondary  = Color(hex: "F5F5F5")
-    static let textPrimary       = Color(hex: "1A1A1A")
-    static let textSecondary     = Color(hex: "6B6B6B")
-    static let textTertiary      = Color(hex: "9E9E9E")
-    static let accentBlue        = Color(hex: "2563EB")
-    static let accentPurple      = Color(hex: "7C3AED")
-    static let divider           = Color(hex: "E5E5E5")
-    static let selectionBg       = Color(hex: "DBEAFE")
-    static let hoverBg           = Color(hex: "F5F5F5")
-    static let aiNewBorder       = Color(hex: "1A5FD4")
+    static let surfaceSecondary  = Color(hex: "FFFFFF")
+    static let textPrimary       = Color(hex: "202124")
+    static let textSecondary     = Color(hex: "626B78")
+    static let textTertiary      = Color(hex: "98A1AD")
+    static let accentBlue        = Color(hex: "2384E8")
+    static let accentPurple      = Color(hex: "B57BE8")
+    static let divider           = Color(hex: "2384E8").opacity(0.55)  // stronger accent divider between panels
+    static let selectionBg       = Color(hex: "FFFFFF")
+    static let hoverBg           = Color(hex: "FFFFFF")
+    static let aiNewBorder       = Color(hex: "2384E8")
 
     // — Additional tokens for commonly-used colors —
-    static let fillTertiary      = Color(hex: "F8F8F8")   // light content background
-    static let accentGreen       = Color(hex: "15803D")   // success / saved text
-    static let accentRed         = Color(hex: "B91C1C")   // error / stop
-    static let accentAmber       = Color(hex: "F59E0B")   // warning
-    static let pillBorderGray    = Color(hex: "E8E8E8")   // 1px border close to divider
-    static let mutedGray         = Color(hex: "C0C0C0")   // secondary icon/text
-    static let nearBlack         = Color(hex: "0A0A0A")   // near-black text
-    static let mediumGray        = Color(hex: "5A5A5A")   // medium gray text
-    static let lightBlueBg       = Color(hex: "E8F0FE")   // selected tab background
-    static let lightBlueBorder   = Color(hex: "C5D8FC")   // selected tab border
-    static let lightGreenBg      = Color(hex: "F0FDF4")   // green badge bg
-    static let knowledgeBlue     = Color(hex: "3B67D6")   // knowledge badge text
-    static let linkBlue          = Color(hex: "3B7DD8")   // user note link text
-    static let highlightBlue     = Color(hex: "4A8BFA")   // gradient highlight
-    static let veryLightGray     = Color(hex: "D0D0D0")   // empty state text
-    static let statusGreen       = Color(hex: "34C759")   // status badge green
-    static let statusBlue        = Color(hex: "007AFF")   // status badge blue
+    static let fillTertiary      = Color(hex: "FFFFFF")   // light content background
+    static let accentGreen       = Color(hex: "2384E8")   // success / saved text
+    static let accentRed         = Color(hex: "D85B66")   // error / stop
+    static let accentAmber       = Color(hex: "2384E8")   // legacy warning, mapped to primary blue in live UI
+    static let pillBorderGray    = Color(hex: "C7DBEE")   // 1px border close to divider
+    static let mutedGray         = Color(hex: "B7C0CB")   // secondary icon/text
+    static let nearBlack         = Color(hex: "17191C")   // near-black text
+    static let mediumGray        = Color(hex: "5D6876")   // medium gray text
+    static let lightBlueBg       = Color(hex: "FFFFFF")   // selected tab background
+    static let lightBlueBorder   = Color(hex: "9CCBF4")   // selected tab border
+    static let lightGreenBg      = Color(hex: "FFFFFF")   // saved badge bg
+    static let knowledgeBlue     = Color(hex: "2384E8")   // knowledge badge text
+    static let linkBlue          = Color(hex: "2384E8")   // user note link text
+    static let highlightBlue     = Color(hex: "6EB6FF")   // gradient highlight
+    static let veryLightGray     = Color(hex: "CBD4DE")   // empty state text
+    static let statusGreen       = Color(hex: "2384E8")   // status badge blue
+    static let statusBlue        = Color(hex: "2384E8")   // status badge blue
     static let statusGray        = Color(hex: "8E8E93")   // status badge gray
-    static let statusOrange      = Color(hex: "FF9500")   // status badge orange
-    static let amberBorder       = Color(hex: "FBBF24")   // amber border
-    static let lightPurpleBg     = Color(hex: "EDE9FE")   // purple card bg
-    static let searchCountGray   = Color(hex: "999999")   // search count text
-    static let badgeBgGray       = Color(hex: "F0F0F0")   // badge background
-    static let stopBorderRed     = Color(hex: "DC3545")   // stop button border
-    static let notesDividerGray  = Color(hex: "AAAAAA")   // notes divider
-    static let deepBlue          = Color(hex: "3B7DD8")   // user note text
-    static let pillBorderColor   = Color(hex: "E8E8E8")   // tab/border pill
+    static let statusOrange      = Color(hex: "F0A62B")   // status badge orange
+    static let amberBorder       = Color(hex: "CFEAFF")   // legacy warning border, mapped to primary blue in live UI
+    static let lightPurpleBg     = Color(hex: "FFFFFF")   // purple card bg
+    static let searchCountGray   = Color(hex: "9BA5B1")   // search count text
+    static let badgeBgGray       = Color(hex: "FFFFFF")   // badge background
+    static let stopBorderRed     = Color(hex: "F2B5BC")   // stop button border
+    static let notesDividerGray  = Color(hex: "9CCBF4")   // notes divider
+    static let deepBlue          = Color(hex: "2384E8")   // user note text
+    static let pillBorderColor   = Color(hex: "C7DBEE")   // tab/border pill
 }

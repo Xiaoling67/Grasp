@@ -1,6 +1,6 @@
 import SwiftUI
 
-// Spec 4.4: 44px, #FFF, border-bottom:1px #E8E8E8, pad:0 12px 0 76px
+// Spec 4.4: compact top bar using semantic surfaces and soft pastel dividers.
 struct TopBarView: View {
     @EnvironmentObject var vm: AppViewModel
     var body: some View {
@@ -8,10 +8,10 @@ struct TopBarView: View {
             Spacer().frame(width: 64)
             // Sidebar toggle — 16x16 SVG icon
             Button(action: { vm.sidebarVisible.toggle() }) { SidebarIcon().frame(width: 18, height: 18) }.buttonStyle(.plain)
-            // + New Lecture pill — 12px/500/#5A5A5A, pill radius, 1px #E8E8E8
+            // + New Lecture pill
             Button(action: { vm.showNewLectureModal = true }) {
                 Text("+ New Lecture").font(.inter(size: 11)).foregroundColor(Color.mediumGray)
-                    .padding(.horizontal, 8).padding(.vertical, 1).background(Color.white).cornerRadius(980)
+                    .padding(.horizontal, 10).padding(.vertical, 2).background(Color.warmCream).cornerRadius(980)
                     .overlay(RoundedRectangle(cornerRadius: 980).stroke(Color.pillBorderGray, lineWidth: 1))
             }.buttonStyle(.plain)
             // Tabs
@@ -22,17 +22,39 @@ struct TopBarView: View {
             // Recording controls — ⏸/▶ pause, ■ stop
             if vm.isRecording {
                 HStack(spacing: 4) {
-                    Button(action: { vm.togglePause() }) {
-                        Text(vm.isPaused ? "▶" : "⏸").font(.inter(size: 10)).foregroundColor(Color.mediumGray).frame(width: 18, height: 16)
-                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.pillBorderGray, lineWidth: 1))
-                    Button(action: { Task { await vm.stopLecture() } }) {
-                        Text("■").font(.inter(size: 9)).foregroundColor(Color.accentRed).frame(width: 18, height: 16)
-                    }.buttonStyle(.plain).overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.stopBorderRed.opacity(0.3), lineWidth: 1))
+                    RecordingControlButton(symbol: vm.isPaused ? "▶" : "⏸", fontSize: 10, color: .mediumGray, borderColor: .pillBorderGray) {
+                        vm.togglePause()
+                    }
+                    RecordingControlButton(symbol: "■", fontSize: 9, color: .accentRed, borderColor: .stopBorderRed.opacity(0.3)) {
+                        Task { await vm.stopLecture() }
+                    }
                 }.padding(.trailing, 8)
             }
         }
-        .frame(height: 18).background(Color.white)
+        .frame(height: 22).background(Color.appBackground)
         .overlay(Rectangle().fill(Color.pillBorderGray).frame(height: 1), alignment: .bottom)
+    }
+}
+
+// Pause/stop hit targets were too small (18x16) to click reliably, which read as
+// "unresponsive" — this widens the tap area and adds hover/press feedback so a click
+// is visibly acknowledged even before the state actually changes.
+struct RecordingControlButton: View {
+    let symbol: String; let fontSize: CGFloat; let color: Color; let borderColor: Color
+    let action: () -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Text(symbol).font(.inter(size: fontSize)).foregroundColor(color)
+                .frame(width: 26, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(isHovering ? Color.pillBorderGray.opacity(0.35) : Color.clear)
+        .cornerRadius(3)
+        .overlay(RoundedRectangle(cornerRadius: 3).stroke(borderColor, lineWidth: 1))
+        .onHover { isHovering = $0 }
     }
 }
 
@@ -62,8 +84,8 @@ struct TabPill: View {
             if !l || !vm.isRecording { Button(action: { vm.closeTab(id: tab.id) }) { Text("×").font(.inter(size: 11)) }.buttonStyle(.plain) }
         }
         .padding(EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 8))
-        .background(a && l ? Color.lightBlueBg : a ? Color.white : Color.clear).cornerRadius(4)
-        .overlay(a && l ? RoundedRectangle(cornerRadius: 4).stroke(Color.lightBlueBorder, lineWidth: 1) : a ? RoundedRectangle(cornerRadius: 4).stroke(Color.pillBorderGray, lineWidth: 1) : nil)
+        .background(a && l ? Color.lightBlueBg : a ? Color.warmCream : Color.clear).cornerRadius(8)
+        .overlay(a && l ? RoundedRectangle(cornerRadius: 8).stroke(Color.lightBlueBorder, lineWidth: 1) : a ? RoundedRectangle(cornerRadius: 8).stroke(Color.pillBorderGray, lineWidth: 1) : nil)
         .shadow(color: a && !l ? .black.opacity(0.05) : .clear, radius: 3, y: 1)
         .foregroundColor(a && l ? Color.aiNewBorder : a ? Color.nearBlack : Color.textTertiary)
         .onTapGesture { vm.activeTabId = tab.id }
