@@ -1,10 +1,74 @@
 # Grasp — PRD v1.1 (Founder's Revision)
 
-**Version:** 1.1-r2
-**Date:** 2026-06-27
+**Version:** 1.1-r3
+**Date:** 2026-06-28
 **Platform:** macOS 14.0+ | Swift 5.9 | SwiftUI + AppKit
 **Status:** In development — rewrite to match Founder requirements
 **Window:** Single-window app, default 1280×800, minimum 960×640
+
+---
+
+## v1.1-r3 Implementation Clarifications
+
+This section locks the execution details that were missing from v1.1-r2 and caused partial implementations to still feel wrong.
+
+1. **Divider drag math must be relative to drag start.** Vertical and horizontal dividers must store their starting width/ratio at drag begin, then apply `start + translation`. They must not repeatedly add/subtract `translation` from the already-mutated value during `onChanged`, because that creates runaway resizing and visible jumps.
+
+2. **Notes are flat everywhere, not only in the live panel.** Past lecture views, export flows, and any read-only note surfaces must render notes as plain flat entries. They must not show bullets, indentation, `level`-based prefixes, or concept-map hierarchy.
+
+3. **Rich-text note storage needs read-safe fallback.** Notes saved as HTML/RTF must render back as user-readable text in read-only surfaces. Raw HTML tags must never appear in the UI or exported documents.
+
+4. **`NSTextView` should be selectable/editable at creation time.** The Notes editor should rely on native `NSTextView` click, double-click, selection, and keyboard handling. SwiftUI state may mark which note is active, but it must not make the text view temporarily unselectable or steal focus during normal clicks.
+
+5. **Empty note deletion is part of save semantics.** If a note is empty or whitespace-only when editing ends, it should be removed rather than persisted as a blank HTML/text row.
+
+6. **Selection popup coordinates must be panel-relative and clamped.** Popup placement must be calculated from the selected glyph rect plus the text view container origin, then clamped to the current transcript panel size. It must not use fixed global bounds such as `100...750`.
+
+7. **Selection popup dismissal must cover real macOS interactions.** The popup must dismiss on outside click, Esc, any text-entry key, layout resize, and transcript scroll start/scroll movement.
+
+8. **AI notes must be generated from sealed transcript blocks.** When a transcript block is sealed, Grasp must call the AI note generator with the sealed block, recent notes, slide structure, and subject, then append at most one new flat note. Having an editor UI without this sealed-block-to-note append path does not satisfy “Real-Time AI Notes.”
+
+9. **AI notes must not reintroduce hierarchy through data.** The note generator prompt and save path must not request or depend on `level 0/1/2`. Saved AI notes should use `source = "ai"` for visual new-note treatment, but all user-visible note surfaces must remain flat.
+
+10. **Rich-text parsing must be format-aware.** Plain AI-generated text must be assigned directly to `NSTextView.string`. Only content that actually looks like HTML/RTF should go through rich-text parsing. Plain text must never disappear, gain unexpected spacing, or render as markup because it was parsed as HTML.
+
+11. **`⌘N` must be context-aware.** During an active live lecture on the live tab, `⌘N` creates a new blank note with focus in the Notes panel. Outside that context, `⌘N` opens the New Lecture flow.
+
+12. **Apple Notes means one flowing text document, not many editor rows.** The Notes panel must be implemented as one native `NSScrollView` containing one continuous `NSTextView`. `note_blocks` may remain the persistence format, but the UI must not render one `NSTextView` per note row. Users should experience a single editable page: click anywhere to place the cursor, double-click to select words, press Return for a new line, and keep typing without crossing component boundaries.
+
+13. **Numbering is text formatting, not data hierarchy.** AI notes may use Apple Notes-style structured numbering up to three visible depths: `1.`, `1.1`, and `1.1.1`. The third depth should be reserved for concrete examples, formulas, data points, exceptions, or short supporting details. This must not revive `level 0/1/2`, tree rendering, parent/child note records, bullets, or indentation-driven concept maps.
+
+14. **AI notes should choose practical structure by content.** Default AI output should use one or two numbered depths. Use the third depth only when the transcript contains enough detail to justify it. For comparisons, classifications, variables, or data-heavy explanations, the AI may append a compact markdown-style table inside the same document text.
+
+15. **The Notes toolbar should expose native editing commands.** The live Notes panel must provide Apple Notes-like controls for bold, italic, underline, text color, highlight color, three numbering insertions (`1.`, `1.1`, `1.1.1`), and a quick table template. Keyboard shortcuts such as `⌘B`, `⌘I`, and `⌘U` must continue to work through native `NSTextView` editing behavior.
+
+16. **Images must persist, not only appear in memory.** User image insertion must use native `NSTextAttachment` and save rich notes with an attachment-preserving format. If the note contains images, Grasp stores RTF/base64 content and restores it into the same continuous `NSTextView` on reload. AI image generation is a later provider/model integration, but it must reuse this same attachment-capable note document.
+
+17. **AI Notes must have product-quality generation control.** Each sealed transcript block should produce a note only when the model is confident the content is useful, specific, and non-duplicative. Weak/filler content should be skipped. The AI prompt must prefer definitions, frameworks, formulas, causal mechanisms, comparisons, exam-worthy distinctions, concrete numbers, and examples over generic summaries.
+
+18. **Stopping a lecture must not lose the final note.** If the user stops while an active transcript block exists, Grasp must seal that block, allow its AI note task to finish, and only then finalize the lecture. The app must not set a state that prevents the final sealed block from appending an AI note, and must not cancel the latest note task before it has a chance to save.
+
+19. **Every lecture should end with a reviewable summary.** On stop, after the final live note finishes, Grasp should append a concise `Summary` section with 3-5 numbered takeaways and a compact `Key Terms` table when real terms are present. This turns the live stream into a review artifact instead of a pile of fragments.
+
+20. **AI Notes status must be visible.** The Notes header should show a small native status pill such as `Ready`, `Writing...`, `Listening`, `Updated`, `Summarizing...`, or `Summary added`, so the user can tell whether the AI is working, skipped low-value content, or finished.
+
+21. **AI Notes should learn from user edits locally.** When the user edits the continuous notes document, Grasp should infer a lightweight note style guide from the plain text: concision level, numbering preference, third-depth usage, and table preference. This guide should be stored locally in settings and passed into future AI note and summary prompts. No extra user setup should be required.
+
+22. **AI Notes needs a local duplicate gate.** Even if the model misses a duplicate, Grasp should normalize the candidate note and compare it with recent notes before saving. Highly overlapping or contained notes should be skipped locally and the AI Notes status should reflect that a duplicate was skipped.
+
+23. **AI Notes must use transcript context without mining stale content.** Each AI note request should include the current sealed transcript block plus a short rolling window of recent sealed blocks. The model may use prior blocks only to resolve pronouns, continuity, slide focus, and topic context. It must create new notes from the current sealed block only, so old content is not repeatedly re-mined.
+
+24. **AI Notes should capture professor emphasis.** The note generator should explicitly watch for emphasis cues such as "remember", "key", "exam", "important", "the point is", and "notice". When such cues are present, the output should surface them as `Key point:` or `Exam cue:` inside the Apple Notes-style text.
+
+25. **AI Notes detail must be user-controllable.** The Notes panel should expose a three-level detail control above the editor: `Concise`, `Balanced`, and `Detailed`. The selected level should persist locally and affect both real-time AI notes and end-of-lecture summaries.
+
+26. **Detail levels must have concrete generation standards.** `Concise` means one line, roughly 12-20 words, usually only `1.`. `Balanced` means 1-3 lines, roughly 22-45 words, usually `1.` and `1.1`, with `1.1.1` only for concrete examples/formulas/exam cues. `Detailed` means 3-6 lines, roughly 45-90 words, allowing mechanisms, examples, formulas, exceptions, and compact tables when useful.
+
+27. **The four live quadrants must share one panel grammar.** Transcript, AI Notes, Auto Explain, and Cold Call / Save / Search must each have the same pastel-blue panel header treatment. No quadrant should look more "official" than the others because only some panels have headers. Each header must include a small settings gear on the right.
+
+28. **AI Notes settings must live behind the header gear.** The AI Notes gear should contain the `Concise / Balanced / Detailed` control and a free-form "note framework" field where the user can describe their preferred generated-note structure. This framework must persist locally and be passed into AI note and summary prompts.
+
+29. **Auto Explain settings must let users declare existing knowledge.** The Auto Explain gear should expose a free-form "existing knowledge" field. Terms, formulas, and concepts entered there should persist locally and should be sent to Auto Explain detection/search prompts so Grasp avoids explaining what the user already knows.
 
 ---
 
@@ -30,7 +94,7 @@ Grasp is a next-generation AI note-taking assistant for live lectures and meetin
 |------|----------------|----------------------------------------|------------------------------------------|
 | **Layout** | Side-by-side (transcript \| notes) with bottom panel tabs | 2×2 grid layout (65/35 vertical, 55/45 horizontal). Horizontal divider **fixed**. | 2×2 grid layout. **ALL dividers draggable** — vertical AND horizontal. User freely resizes all 4 quadrants. |
 || **Selection popup** | Broken (NSEvent) | Fixed via NotificationCenter with **80ms debounce**. Slow, unresponsive. | **Instant** popup. **4 consistent buttons** (K, L, Search, Note) — all icon + label or all icon-only. No mixing. Added **Note** button copies to notes. |
-| **AI Notes** | Flat per-seal notes, ≤25 words, level 0/1/2 | **Concept Map** — hierarchical tree with indented bullets, parent/child/depth indentation. **Founder hates it.** | **Apple Notes clone** — click to edit, double-click word select, click empty area to create new note. No conflicting tap gestures. NSTextView responds to clicks immediately. |
+| **AI Notes** | Flat per-seal notes, ≤25 words, level 0/1/2 | **Concept Map** — hierarchical tree with indented bullets, parent/child/depth indentation. **Founder hates it.** | **Apple Notes clone** — one continuous rich-text document, click to edit, double-click word select, numbered text structure up to `1.1.1`, no tree data, no conflicting tap gestures. NSTextView responds to clicks immediately. |
 | **Dividers** | Static | Vertical resizable; horizontal fixed 65/35 | **ALL dividers movable** — vertical AND horizontal. 4 freely resizable quadrants. |
 | **UI quality** | Prototype | Prototype with hardcoded hex colors | **Beautiful, polished** — design system, proper spacing, animations, native feel. |
 | Auto Explain | Stateless per block | Student Knowledge Profile (SQLite) | Unchanged from v1.1-r1 |
@@ -123,8 +187,8 @@ The Notes panel must behave **IDENTICALLY** to Apple's native Notes app on macOS
 
 **1. Visual layout:**
 - Plain white background, no tree, no indentation.
-- No bullet characters (▸, •, ◦) — notes are plain rich-text blocks.
-- No concept hierarchy rendering — all notes displayed as a flat, scrollable list of rich text entries.
+- No bullet characters (▸, •, ◦) for AI structure. AI structure uses typed numbering such as `1.`, `1.1`, and `1.1.1`.
+- No concept hierarchy rendering — all notes are displayed inside one continuous rich-text document.
 - Header area with "AI NOTES" label (same style as Apple Notes' title area).
 - Smooth scrolling with rubber-banding at edges (native NSScrollView behavior).
 
@@ -133,19 +197,32 @@ The Notes panel must behave **IDENTICALLY** to Apple's native Notes app on macOS
 |- **Double-click to edit** — double-clicking a note enters edit mode AND selects the word under the cursor (matching Apple Notes behavior for word selection).
 |- **Click empty area to create** — clicking on an empty/whitespace area in the notes panel (not on any existing note) creates a new blank note at the bottom of the list with the cursor blinking and ready for typing. This matches Apple Notes' behavior of "click anywhere to start typing."
 |- Edit in place — no separate text field, no modal, no sheet. The text itself becomes editable.
-|- **Rich text support** — bold, italic, underline, strikethrough (via keyboard shortcuts ⌘B, ⌘I, ⌘U).
+|- **Rich text support** — bold, italic, underline, text color, highlight color, and quick table templates via toolbar controls. Keyboard shortcuts `⌘B`, `⌘I`, and `⌘U` must work inside the editor.
 |- **NSTextView-based** editing, not SwiftUI TextField. Use AppKit's NSTextView for native text editing behavior.
 |- **Auto-save on blur** — edits committed when focus leaves the note.
-|- **Return/Enter** — creates a new note below (like Notes app creates a new line within the note, but for Grasp: Enter should create a new note entry within the current note block).
-|- **Shift+Return** — line break within the same note.
+|- **Return/Enter** — creates a new line in the same continuous Notes document, matching Apple Notes behavior.
+|- **Shift+Return** — also inserts a line break; no special row-splitting behavior.
 |- **Delete empty note** — if a note becomes empty on blur, remove it (like Notes app removes empty entries).
 
-**3. AI-generated notes appear as editable rich text blocks:**
-- Each AI note is a rich text block in the flat list.
+**3. AI-generated notes appear as editable rich text inside the same document:**
+- Each AI note is appended into the single flowing rich text document.
 - AI notes are pre-populated with content, fully editable.
-- When AI generates a new note, it slides in with a smooth animation (opacity + slight vertical offset).
-- New notes are distinguished by a subtle blue left border (2px, `#1A5FD4`) on the left edge — this fades after 5 seconds.
-- After edit, the note is marked as `manual` and the blue border is removed.
+- AI notes use structured numbering when helpful:
+  - `1.` for the main idea.
+  - `1.1` for a short explanation, definition, or relation.
+  - `1.1.1` only for concrete examples, formulas, numbers, exceptions, or supporting details.
+- For comparisons, classifications, variables, or data-heavy explanations, AI notes may include a compact markdown-style table after the relevant numbered line.
+- AI must never overwrite user edits. New AI text appends to the end of the document.
+- AI should skip low-confidence filler and duplicated content instead of adding noisy notes.
+- The Notes header should show AI generation status while writing, listening, or summarizing.
+- Stopping the lecture should first preserve the final transcript block and its AI note, then append a `Summary` section for review.
+- User edits should update a local style guide so later AI notes match the student's preferred concision, numbering, depth, and table usage.
+- Candidate AI notes should pass a local duplicate check before being saved.
+- AI should use recent transcript context for continuity, while mining only the current sealed block for new notes.
+- Professor-emphasized ideas should surface as `Key point:` or `Exam cue:` phrasing.
+- Users can select `Concise`, `Balanced`, or `Detailed` from the AI Notes settings gear; the choice persists and changes note length/detail.
+- Users can provide a custom note-generation framework in the AI Notes settings gear.
+- Users can provide existing knowledge in the Auto Explain settings gear, so the app avoids explaining familiar terms.
 
 **4. User-created notes:**
 - Click the "+" button in the header (or press ⌘N) to create a new blank note.
@@ -158,46 +235,47 @@ The Notes panel must behave **IDENTICALLY** to Apple's native Notes app on macOS
 - Rubber-banding at content edges.
 - Auto-scroll to bottom when a new AI note arrives (unless user has scrolled up manually).
 
-**6. Note deletion:**
-- Hover over a note → subtle "×" button appears in the top-right corner of the note frame.
-- Click "×" → note is deleted with a fade-out animation.
-- **Backspace on empty note** — if the user empties a note and presses backspace (or blurs), the note is deleted.
+**6. Deletion/editing semantics:**
+- Because the editor is one continuous document, deletion is native text deletion inside `NSTextView`.
+- Empty or whitespace-only persisted note content is removed on save.
+- Do not add per-row delete buttons unless the product returns to row-based note records, which this revision rejects.
 
 **7. Rich text persistence:**
 - Notes are saved as **HTML** or **RTF** in SQLite (not plain text), preserving rich text formatting.
 - On reload, rich text is restored exactly as edited.
+- Read-only surfaces and export must strip HTML safely to readable text when they do not render rich text.
+
+**7.1 Images, attachments, and AI-generated images:**
+- User-inserted images are inserted through the Notes toolbar image button.
+- Images are inserted as native `NSTextAttachment` objects inside the continuous `NSTextView`.
+- Notes containing image attachments are persisted as RTF/base64, because HTML serialization is not reliable enough for native attachments.
+- On reload, images must rehydrate into the `NSTextView` at the original position.
+- Read-only surfaces and export must show readable text, not raw RTF/base64 payloads.
+- AI-generated images are a later feature built on the same attachment-capable document. They require an image generation provider/model, prompt provenance, and a clear label that the image was AI-generated.
 
 **8. Legacy data compatibility (v1.0 flat notes):**
 |- Old v1.0 notes are rendered as plain rich text blocks (no hierarchy).
 |- The concept map data model is **deleted** — no `ConceptNode`, no `conceptMap`, no tree structures.
 |- All notes become a flat array of editable rich text blocks.
 
-**9. Tap gesture resolution and NSTextView responsiveness — CRITICAL IMPLEMENTATION NOTES:**
+**9. Single-document NSTextView responsiveness — CRITICAL IMPLEMENTATION NOTES:**
 
 These issues have been observed in the current implementation and must be fixed to achieve Apple Notes-level behavior:
 
-|- **No `onTapGesture` on container VStack/ScrollView:**
-|  - Placing an `.onTapGesture` modifier on the outermost VStack, List, or ScrollView in `NotesPanelView` intercepts ALL click events before they reach the `NSTextView` inside each `NoteRichEditor`. This is the #1 cause of "clicking does nothing."
-|  - Instead, use the native NSTextView click handling. NSTextView automatically handles single-click (move cursor), double-click (select word), and triple-click (select line).
-|  - If a tap gesture is needed for "click empty area → new note," use a **background tap gesture** that only fires when the click does NOT hit any NSTextView. Implement this via `NSViewRepresentable` coordinator hit-testing or by using `NSTextViewDelegate` methods rather than SwiftUI gesture modifiers on the container.
+|- **No row-based editors:**
+|  - Do not render a `ForEach` of note rows containing many `NSTextView` instances.
+|  - The Notes panel must expose one document surface: one `NSScrollView` and one `NSTextView`.
+|  - Native `NSTextView` behavior should handle single-click cursor placement, double-click word selection, triple-click line selection, and keyboard editing.
 
-|- **`editingId` state management must trigger edit mode immediately:**
-|  - `editingId` must be set to the note's ID **before** the note's `NoteRichEditor` appears, so the editor can become first responder on the same runloop cycle.
-|  - Use `onAppear` or `NSViewRepresentable.updateNSView` to call `makeFirstResponder()` on the NSTextView when `editingId` matches.
-|  - Do NOT rely on `onTapGesture` + `DispatchQueue.main.asyncAfter` to set `editingId` — this creates a race condition where the NSTextView appears but is not made first responder.
-|  - Test: tapping any note text should immediately show a blinking cursor with zero perceptible delay.
+|- **Focus must target the document editor immediately:**
+|  - `⌘N`, the header plus button, and clicking the empty editor area must call `makeFirstResponder()` on the single document `NSTextView`.
+|  - Do not use SwiftUI tap gestures on the editor container to fake editing mode.
+|  - Test: clicking anywhere in the editor should immediately show a blinking cursor with zero perceptible delay.
 
-|- **`NoteRichEditor` (NSViewRepresentable) must respond to clicks immediately:**
-|  - Override `mouseDown:` in the wrapped NSTextView or its coordinator to call `makeFirstResponder()` synchronously.
+|- **The wrapped NSTextView must respond to clicks immediately:**
+|  - Override `mouseDown:` only to synchronously call `makeFirstResponder()`, then forward to `super`.
 |  - Ensure `NSTextView.isSelectable = true` and `NSTextView.isEditable = true` are set at init time.
-|  - The NSViewRepresentable must forward click events to the underlying NSTextView without SwiftUI gesture interference.
-|  - Verify: clicking anywhere in a note's visible text area should immediately show a blinking cursor and allow typing.
-
-|- **"+" button creates new blank note with blinking cursor:**
-|  - On "+" tap, immediately create a new `NoteBlock` with empty content and append it to the notes array.
-|  - Set `editingId` to the new note's ID **synchronously** in the same action handler (not after an async delay).
-|  - The new note should appear at the bottom of the list and auto-scroll into view.
-|  - On the next view update, the `NoteRichEditor` for this new note must call `window?.makeFirstResponder(nstextView)` in its `updateNSView` method.
+|  - Verify: clicking anywhere in the note document should immediately show a blinking cursor and allow typing.
 
 ### What to DELETE from codebase
 - `ConceptNode` struct (data model)
@@ -208,36 +286,62 @@ These issues have been observed in the current implementation and must be fixed 
 - `conceptNodeView()` method
 - `conceptSlideSection()` method
 - `buildConceptTree` call in `NotesPanelView`
-- All level/indent/bullet logic in `NoteRow`
+- All row-level editor logic and multiple-`NSTextView` note rows
 - `ConceptMap` related properties in `AppViewModel`
 - Any code that renders hierarchical indentation
 
 ### What to BUILD
-- Flat rich text editor using `NSTextView` wrapped in `NSViewRepresentable`
+- Single continuous rich text document using one `NSTextView` inside one `NSScrollView`
 - Apple Notes-style visual layout (no bullets, no indentation)
 - Inline editing with click-to-edit
-- Rich text toolbar or keyboard shortcuts (⌘B, ⌘I, ⌘U)
-- Smooth animations for add/remove notes
-- Proper focus management between notes
+- Rich text toolbar and keyboard shortcuts (⌘B, ⌘I, ⌘U)
+- Text color, highlight color, and three quick numbering insertions (`1.`, `1.1`, `1.1.1`)
+- Quick table template insertion for comparison/data notes
+- Image insertion using a visible toolbar button and native `NSTextAttachment`
+- Attachment-preserving persistence for notes that contain images
+- AI prompt rules that generate useful numbered text and compact tables without data hierarchy
+- Proper focus management for the single document editor
 
 ### Acceptance Criteria
-|- [ ] Notes panel looks EXACTLY like Apple Notes — flat, white, no bullets, no indent.
+|- [ ] Notes panel feels like Apple Notes — one white flowing document, no rows, no concept map, no tree indentation.
 |- [ ] Click any note text → instantly editable in place (blinking cursor appears immediately).
-|- [ ] Click empty/whitespace area in notes panel → creates new blank note with cursor blinking.
+|- [ ] Click empty/whitespace area in notes panel → cursor appears in the single document and user can type.
 |- [ ] Double-click any note → enters edit mode AND selects the word under cursor.
 |- [ ] Rich text support: ⌘B bold, ⌘I italic, ⌘U underline work inside notes.
-|- [ ] Enter creates new note below within the note block.
-|- [ ] Shift+Enter creates line break within the same note.
+|- [ ] Toolbar supports bold, italic, underline, text color, highlight color, `1.`, `1.1`, `1.1.1`, and table template insertion.
+|- [ ] Enter inserts a new line in the same continuous document.
+|- [ ] Shift+Enter inserts a line break in the same continuous document.
 |- [ ] Auto-save on blur — edits persisted to SQLite.
-|- [ ] New AI notes slide in with animation.
-|- [ ] Blue left border on new AI notes, fades after 5 seconds.
-|- [ ] Hover "×" button on each note for deletion.
+|- [ ] New AI notes append to the bottom of the continuous document without overwriting user edits.
+|- [ ] AI notes use up to three visible numbering depths as text, not data hierarchy.
+|- [ ] AI notes can include compact markdown-style tables for comparison/data content.
+|- [ ] AI skips low-confidence filler or duplicate content instead of appending noise.
+|- [ ] User note edits update a locally stored AI note style guide.
+|- [ ] AI note and summary prompts receive the learned style guide.
+|- [ ] Candidate AI notes are locally duplicate-checked against recent notes before save.
+|- [ ] AI note generation receives a rolling transcript context window, not only the current block.
+|- [ ] AI prompt explicitly restricts note creation to the current sealed block.
+|- [ ] AI prompt captures professor emphasis cues as `Key point:` or `Exam cue:`.
+|- [ ] Notes panel exposes a three-level AI detail control: `Concise`, `Balanced`, `Detailed`.
+|- [ ] AI detail level persists locally.
+|- [ ] AI note and summary prompts receive concrete detail policies for the selected level.
+|- [ ] AI Notes settings gear exposes a free-form note framework input.
+|- [ ] The note framework persists locally and is passed into AI note and summary prompts.
+|- [ ] Auto Explain settings gear exposes a free-form existing-knowledge input.
+|- [ ] Existing knowledge persists locally and is passed into Auto Explain detection/search prompts.
+|- [ ] Stopping a lecture does not cancel or lose the final sealed block's AI note.
+|- [ ] Stopping a lecture appends a concise `Summary` section when enough transcript/notes exist.
+|- [ ] Notes header shows an AI Notes status pill.
 |- [ ] Smooth scrolling with rubber-banding at edges.
 |- [ ] Notes persisted as RTF/HTML (rich text preserved on reload).
+|- [ ] User can insert an image from the Notes toolbar.
+|- [ ] Notes containing images persist as attachment-capable RTF/base64 and reload into the editor.
+|- [ ] Raw HTML never appears in read-only note views or exports.
+|- [ ] AI-generated images are not marked complete until an image provider/model is integrated.
 |- [ ] All concept map / tree code is removed from the codebase.
-|- [ ] No `.onTapGesture` on container VStack/ScrollView in NotesPanelView that intercepts NSTextView clicks.
-|- [ ] `editingId` is set synchronously (no `DispatchQueue.main.asyncAfter`) when entering edit mode.
-|- [ ] NSTextView in `NoteRichEditor` responds to mouseDown immediately — no SwiftUI gesture steal.
+|- [ ] NotesPanelView uses exactly one document `NSTextView` inside one `NSScrollView`.
+|- [ ] No row-based `NoteRichEditor` / `NoteRow` implementation remains.
+|- [ ] The document NSTextView responds to mouseDown immediately — no SwiftUI gesture steal.
 
 ---
 
@@ -263,7 +367,7 @@ The horizontal divider between top and bottom rows was **fixed at 65/35** — a 
 **2. Horizontal divider (between top and bottom rows):**
 - **NEW: Must become draggable.**
 - Drag handle: a 12px-tall strip between the top and bottom rows.
-- Visual: 1px `#E8E8E8` top line, 1px `#E8E8E8` bottom line, with a 10px active drag area in between.
+- Visual: 1px semantic soft divider top line, 1px semantic soft divider bottom line, with a 10px active drag area in between.
 - On hover: cursor changes to `resizeUpDown` (pointing hand with vertical arrows).
 - Drag gesture updates `vm.topRowRatio` (float, 0.3–0.8).
 - Dragging the horizontal divider resizes all 4 quadrants simultaneously.
@@ -298,12 +402,17 @@ The horizontal divider between top and bottom rows was **fixed at 65/35** — a 
 ### Why v1.1-r1 Failed
 The UI used hardcoded hex colors everywhere (`#5A5A5A`, `#C0C0C0`, `#E8E8E8`, `#F8F8F8`), basic SwiftUI shapes, no design system, no animations, and no attention to visual detail. It looked like a prototype, not a professional app.
 
-### Exact Requirements (v1.1-r2)
+### Exact Requirements (v1.1-r3)
 
 **1. Design system — Create a centralized design token system:**
 - Define colors as semantic tokens (not hardcoded hex):
-  - `surfacePrimary` (white)
-  - `surfaceSecondary` (light gray)
+  - `appBackground` (soft page blue)
+  - `surfacePrimary` (clean white document surface)
+  - `surfaceSecondary` (soft blue header fill)
+  - `pastelBlue` / `pastelBlueStrong` (primary learning/AI surface)
+  - `pastelGreen` / `pastelGreenBorder` (legacy aliases mapped to the Grasp blue system)
+  - `pastelYellow` / `pastelYellowBorder` (legacy warning only; do not use in the main live lecture UI)
+  - `pastelPink` (AI activity, rich/detail, warm assistive state)
   - `textPrimary` (near-black)
   - `textSecondary` (medium gray)
   - `textTertiary` (light gray)
@@ -312,10 +421,10 @@ The UI used hardcoded hex colors everywhere (`#5A5A5A`, `#C0C0C0`, `#E8E8E8`, `#
   - `divider` (border lines)
   - `selection` (text selection highlight)
 - Define typography as semantic tokens:
-  - `body` (13pt Inter)
-  - `caption` (11pt Inter)
-  - `small` (10pt Inter)
-  - `title` (14pt Inter semibold)
+  - `body` (14pt rounded macOS system font)
+  - `caption` (11pt rounded macOS system font)
+  - `small` (10pt rounded macOS system font)
+  - `title` (16pt rounded macOS system font semibold)
 - Define spacing as 4px grid:
   - `xs: 4`, `sm: 8`, `md: 12`, `lg: 16`, `xl: 24`, `xxl: 32`
 
@@ -330,21 +439,30 @@ The UI used hardcoded hex colors everywhere (`#5A5A5A`, `#C0C0C0`, `#E8E8E8`, `#
 **3. Color palette refresh:**
 | Token | Old color | New color | Usage |
 |-------|-----------|-----------|-------|
-| surfacePrimary | `#FFFFFF` | `#FFFFFF` | Main backgrounds |
-| surfaceSecondary | `#F8F8F8` | `#F5F5F5` | Header backgrounds, secondary fills |
-| textPrimary | `#0A0A0A` | `#1A1A1A` | Body text |
-| textSecondary | `#5A5A5A` | `#6B6B6B` | Labels, subtitles |
-| textTertiary | `#C0C0C0` | `#9E9E9E` | Placeholder text |
-| accentBlue | `#1A5FD4` | `#2563EB` | Buttons, links, selection highlight |
-| accentPurple | `#7C3AED` | `#7C3AED` | AI indicator (unchanged, good) |
-| divider | `#E8E8E8` | `#E5E5E5` | Separator lines |
-| selection | `#E8F0FE` | `#DBEAFE` | Selected/highlighted backgrounds |
+| appBackground | `#F8F8F8` | `#F8FBFF` | App shell and sidebar |
+| surfacePrimary | `#FFFFFF` | `#FFFFFF` | Main document/card backgrounds |
+| surfaceSecondary | `#F8F8F8` | `#F1F8FF` | Header backgrounds, secondary fills |
+| pastelBlue | `#E8F0FE` | `#EAF5FF` | Primary selected/learning surface |
+| pastelGreen | n/a | `#EAF5FF` | Legacy alias for soft blue balanced state |
+| pastelGreenBorder | n/a | `#CFEAFF` | Legacy alias for soft blue border |
+| pastelYellow | n/a | `#FFF4CC` | Legacy warning only, not live lecture UI |
+| pastelYellowBorder | n/a | `#E8C85C` | Legacy warning border only |
+| pastelPink | n/a | `#FFE8EF` | AI writing/detail assistive state |
+| textPrimary | `#0A0A0A` | `#202124` | Body text |
+| textSecondary | `#5A5A5A` | `#626B78` | Labels, subtitles |
+| textTertiary | `#C0C0C0` | `#98A1AD` | Placeholder text |
+| accentBlue | `#1A5FD4` | `#2384E8` | Primary action, active learning state |
+| accentPurple | `#7C3AED` | `#B57BE8` | Secondary AI accent only |
+| divider | `#E8E8E8` | `#DDEAF6` | Soft separator lines |
+| selection | `#E8F0FE` | `#DDF0FF` | Selected/highlighted backgrounds |
+
+Blue should be the primary brand color for Grasp because it feels focused, trustworthy, and study-oriented. The current app blue system is: primary `#2384E8`, soft fill `#EAF5FF`, and soft border `#CFEAFF`. Green should not appear in the live lecture UI; legacy green token names are kept only as compatibility aliases and mapped to blue. Pink should be used sparingly for AI activity or richer/detail states. Filled controls must use same-hue borders: blue fill with blue border, pink fill with pink border.
 
 **4. Typography:**
-- Use Inter font throughout (already bundled).
+- Use rounded macOS system typography for app UI and the native notes editor. The bundled Inter font may remain for compatibility, but the visible product font should feel softer and more Apple-like.
 - Proper font weights: Regular (400), Medium (500), Semibold (600), Bold (700).
-- Line heights: 1.4× font size for body text, 1.2× for headings.
-- Proper letter-spacing: `-0.01em` for body text (Apple HIG standard).
+- Line heights: 1.45× font size for body text, 1.2× for headings.
+- Letter spacing must remain `0`; do not use negative tracking with the rounded typeface.
 
 **5. Animations:**
 - All view transitions: `.animation(.easeInOut(duration: 0.2), value: state)`.
@@ -374,8 +492,13 @@ The UI used hardcoded hex colors everywhere (`#5A5A5A`, `#C0C0C0`, `#E8E8E8`, `#
 - [ ] Proper corner radii (8px cards, 12px popups).
 - [ ] Subtle shadows on floating elements.
 - [ ] Professional color palette matches new spec.
+- [ ] Main theme uses soft blue as the primary app color, white for document surfaces, and pink only for AI/rich states.
+- [ ] Filled pastel controls use color-matched borders; green is not used in the live lecture UI.
 - [ ] Consistent typography with proper line heights.
+- [ ] UI and notes editor use rounded macOS system typography; no negative tracking.
 - [ ] macOS-native scrollbar and window styling.
+- [ ] Transcript, AI Notes, Auto Explain, and Cold Call / Save / Search use one unified panel header component.
+- [ ] Each of the four live quadrants has a visible settings gear in the top-right of its panel header.
 
 ---
 
