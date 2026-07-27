@@ -2,7 +2,7 @@ import SwiftUI
 
 // Spec 12: Settings — Default Mode + Display
 struct SettingsView: View {
-    @EnvironmentObject var vm: AppViewModel; @State private var mode = "standard"; @State private var tl = "zh-CN"; @State private var fs = "medium"; @State private var st = true; @State private var hf = true
+    @EnvironmentObject var vm: AppViewModel; @State private var mode = "standard"; @State private var tl = "zh-CN"
     @State private var showKnowledgeProfile = false; @State private var knownCount = 0
 
     var body: some View {
@@ -15,9 +15,28 @@ struct SettingsView: View {
             }
             // Display
             VStack(alignment: .leading, spacing: 12) { Text("Display").font(.inter(size: 13, weight: .semibold)).foregroundColor(Color.nearBlack)
-                HStack { Text("Font size").font(.inter(size: 13)).foregroundColor(Color.mediumGray); Spacer(); Picker("", selection: $fs) { Text("Small").tag("small"); Text("Medium").tag("medium"); Text("Large").tag("large") }.pickerStyle(.menu).frame(width: 160) }
-                Toggle("Show translation", isOn: $st).font(.inter(size: 13)).foregroundColor(Color.mediumGray)
-                Toggle("Hover to freeze scroll", isOn: $hf).font(.inter(size: 13)).foregroundColor(Color.mediumGray)
+                HStack {
+                    Text("Font size").font(.inter(size: 13)).foregroundColor(Color.mediumGray)
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: { vm.displayFontSize },
+                        set: { vm.setDisplayFontSize($0) }
+                    )) {
+                        Text("Small").tag("small")
+                        Text("Medium").tag("medium")
+                        Text("Large").tag("large")
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                }
+                Toggle("Show translation", isOn: Binding(
+                    get: { vm.showTranslation },
+                    set: { vm.setShowTranslation($0) }
+                )).font(.inter(size: 13)).foregroundColor(Color.mediumGray)
+                Toggle("Hover to freeze scroll", isOn: Binding(
+                    get: { vm.hoverFreezeEnabled },
+                    set: { vm.setHoverFreezeEnabled($0) }
+                )).font(.inter(size: 13)).foregroundColor(Color.mediumGray)
             }
             // Knowledge Profile
             Button(action: { showKnowledgeProfile = true }) {
@@ -29,7 +48,7 @@ struct SettingsView: View {
             }.buttonStyle(.plain)
             Spacer()
         }.padding(32).frame(maxWidth: 480) }
-        .background(Color.white)
+        .background(Color.surfacePrimary)
         .sheet(isPresented: $showKnowledgeProfile) { KnowledgeProfileView() }
         .onAppear { mode = DatabaseService.shared.getSetting(key: "defaultMode") ?? "standard"; tl = DatabaseService.shared.getSetting(key: "targetLanguage") ?? "zh-CN"; knownCount = MemoryService.shared.getKnownTerms().count }
     }

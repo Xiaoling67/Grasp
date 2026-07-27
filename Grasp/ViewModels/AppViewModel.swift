@@ -15,25 +15,34 @@ import Foundation; import SwiftUI
     @Published var interimText = ""; @Published var isScrollFrozen = false
     @Published var selectedBlockId: String? = nil
     @Published var showFullTranscript = false
+    @Published var displayFontSize = "medium"
+    @Published var showTranslation = true
+    @Published var hoverFreezeEnabled = true
     @Published var highlightedBlockIds = Set<String>()
     @Published var deepgramStatus = "disconnected"
 
     // Notes (Spec 7.2: notesStore) — flat rich-text list, no concept map
     @Published var noteBlocks = [NoteBlock](); @Published var slideStructure = [SlideItem]()
+    @Published var newNoteRequest = 0
+    @Published var aiNotesStatus = "Ready"
+    @Published var noteStyleGuide = AppViewModel.defaultNoteStyleGuide
+    @Published var aiNoteDetailLevel = "balanced"
+    @Published var aiNoteFramework = ""
+
+    // Cold call (Spec 7.2: coldCallStore)
+    @Published var coldCallPhase: ColdCallPhase? = nil
 
     // Bottom panel (Spec 7.2: lectureStore)
     @Published var activeCard: ActiveCardState? = nil; @Published var bottomTab = "current"
     @Published var searchStreaming = false; @Published var streamingTokens = ""
     @Published var sessionSaves = [SavedCard](); @Published var sessionSearches = [SearchResultState]()
 
-    // Cold call (Spec 7.2: coldCallStore)
-    @Published var coldCallPhase: ColdCallPhase? = nil
-
     // Auto Explain
     @Published var autoExplainResult: SearchResultState? = nil
     @Published var autoExplainStreaming = false
     @Published var autoExplainTokens = ""
     @Published var autoExplainNew = false
+    @Published var autoExplainKnowledge = ""
     private var recentlyExplained = Set<String>()
 
     // Modals & Toast
@@ -41,17 +50,23 @@ import Foundation; import SwiftUI
     @Published var showOnboarding = false; @Published var onboardingChecked = false
     @Published var toastMessage: String? = nil; @Published var toastType = "info"
 
-    // Layout — v1.1-r2: all dividers movable
+    // Layout — v1.1-r2: all dividers movable; each column's top/bottom split is independent
     @Published var notesWidth = 400.0
-    @Published var topRowRatio: CGFloat = 0.55  // default 55/45, range 0.30-0.80
+    @Published var leftColumnRatio: CGFloat = 0.55  // Transcript vs Auto Explain, range 0.30-0.80
+    @Published var rightColumnRatio: CGFloat = 0.55 // Notes vs Save/Search, range 0.30-0.80
 
     private let db = DatabaseService.shared; private let ds = DeepSeekService.shared
     private let dg = DeepgramService.shared; private let au = AudioService.shared
     private let tr = QwenTranslationService.shared
     private var interimBuf = ""; private var lastCC: Date?; private var noteTask: Task<Void,Never>?
+    private var noteAgentBusy = false
+    private struct PendingNoteRequest { let lectureId: String; let blockIndex: Int; let text: String }
+    private var pendingNoteRequest: PendingNoteRequest?
+    private var activityToken: NSObjectProtocol?
+    private var autoExplainBusy = false
     private var searchCache = [String:(String,String)]()
 
-    init() { loadPast(); checkOnboarding() }
+    init() { loadPast(); checkOnboarding(); loadNotePreferences() }
 
     // MARK: - Onboarding (Spec 17)
     func checkOnboarding() {
@@ -67,10 +82,18 @@ import Foundation; import SwiftUI
     func loadPast() { pastLectures = db.getLectures() }
 
     func startLecture(name: String?, mode: String, subject: String?, slideURL: URL? = nil) async {
+        au.stopCapture(); dg.disconnect()
         resetLive(); showNewLectureModal = false
         let lid = db.startLecture(name: name, mode: mode, subject: subject)
         activeLectureId = lid; activeLectureName = name; activeLectureMode = mode; activeLectureSubject = subject ?? ""
         isRecording = true; isPaused = false
+        // Prevent App Nap from throttling the keep-alive timer / websocket while the window
+        // is backgrounded or occluded — without this, Deepgram's connection silently drops
+        // a few minutes after the app loses focus.
+        activityToken = ProcessInfo.processInfo.beginActivity(
+            options: [.userInitiated, .idleSystemSleepDisabled, .suddenTerminationDisabled],
+            reason: "Recording live lecture"
+        )
 
         // Parse slides in parallel — does not block recording start
         if let url = slideURL {
@@ -90,26 +113,39 @@ import Foundation; import SwiftUI
         tabs = [tab] + tabs; activeTabId = "live"
         if !(await AudioService.requestPermission()) {
             showToast("Microphone access denied. Please allow it in System Settings → Privacy → Microphone.", type: "error")
-            isRecording = false; return
+            isRecording = false; endActivity(); return
         }
         do {
             try au.startCapture { [weak self] d, _ in self?.dg.sendAudio(d) }
-        } catch { showToast("Microphone failed to start.", type: "error"); isRecording = false; return }
+        } catch { showToast("Microphone failed to start.", type: "error"); isRecording = false; endActivity(); return }
         dg.onFinal = { [weak self] in self?.handleFinal($0) }
         dg.onInterim = { [weak self] in self?.handleInterim($0) }
         dg.onEnd = { [weak self] in self?.handleEnd() }
         dg.onStatus = { [weak self] in self?.deepgramStatus = $0 }
-        // PRD P1-4: generate domain keywords and inject into Deepgram for better terminology recognition
-        let subject = activeLectureSubject
-        let keywords = subject.isEmpty ? [] : await ds.generateKeywords(subject: subject)
-        dg.connect(sr: au.sampleRate, keywords: keywords)
+        // Connect immediately. Keyword generation must not block live transcription.
+        dg.connect(sr: au.sampleRate)
     }
 
     func stopLecture() async {
-        isRecording = false; au.stopCapture(); dg.disconnect()
+        au.stopCapture(); dg.disconnect()
         if let b = activeBlock, !b.textEn.trimmingCharacters(in: .whitespaces).isEmpty { seal(b.textEn) }
-        if let lid = activeLectureId { db.stopLecture(id: lid) }
-        noteTask?.cancel(); searchCache.removeAll(); coldCallPhase = nil; loadPast()
+        // Drop any merged backlog now — otherwise it would spawn a follow-up note task
+        // right as we're finishing the session, after the summary has already been written.
+        pendingNoteRequest = nil
+        if let task = noteTask { await task.value }
+        if let lid = activeLectureId {
+            await appendLectureSummary(lectureId: lid)
+            db.stopLecture(id: lid)
+        }
+        isRecording = false
+        aiNotesStatus = "Ready"
+        coldCallPhase = nil
+        searchCache.removeAll(); loadPast()
+        endActivity()
+    }
+
+    private func endActivity() {
+        if let token = activityToken { ProcessInfo.processInfo.endActivity(token); activityToken = nil }
     }
 
     func togglePause() { isPaused.toggle() }
@@ -162,6 +198,7 @@ import Foundation; import SwiftUI
         let bi = liveBlocks[i].blockIndex; activeBlockId = nil
         interimText = ""
         db.saveBlock(lectureId: lid, blockIndex: bi, textEn: text, textZh: nil)
+        detectCC(text)
 
         if activeLectureMode == "international" {
             Task { let zh = try? await tr.translate(text: text, subject: activeLectureSubject.isEmpty ? nil : activeLectureSubject)
@@ -171,8 +208,29 @@ import Foundation; import SwiftUI
         }
         // Auto-explain: runs fully in parallel, does not affect NoteAgent
         let capturedText = text; let capturedLid = lid
-        Task { await autoExplain(text: capturedText, lectureId: capturedLid) }
-        detectCC(text)
+        if !autoExplainBusy {
+            autoExplainBusy = true
+            Task {
+                await autoExplain(text: capturedText, lectureId: capturedLid)
+                await MainActor.run { self.autoExplainBusy = false }
+            }
+        }
+
+        let request = PendingNoteRequest(lectureId: lid, blockIndex: bi, text: text)
+        guard !noteAgentBusy else {
+            // Real-time notes must not fall further and further behind: instead of a
+            // growing FIFO, merge into the single pending slot so the worst-case lag stays
+            // capped at "current request + one follow-up," and nothing said in between is
+            // silently dropped.
+            if let pending = pendingNoteRequest {
+                pendingNoteRequest = PendingNoteRequest(lectureId: lid, blockIndex: bi, text: pending.text + "\n\n" + text)
+            } else {
+                pendingNoteRequest = request
+            }
+            aiNotesStatus = "Catching up..."
+            return
+        }
+        runNoteRequest(request)
     }
 
     // MARK: - Cold Call (Spec 6.10, 3.4)
@@ -180,10 +238,9 @@ import Foundation; import SwiftUI
         try! NSRegularExpression(pattern: #"\bwho (knows|can tell|can explain|can answer|wants to)\b"#, options: .caseInsensitive),
         try! NSRegularExpression(pattern: #"\bcan (anyone|someone|somebody) (tell|explain|answer|describe|name|give)\b"#, options: .caseInsensitive),
         try! NSRegularExpression(pattern: #"\bdoes anyone (know|remember|recall|have)\b"#, options: .caseInsensitive),
-        try! NSRegularExpression(pattern: #"\banybody (know|want to|care to)\b"#, options: .caseInsensitive),
-        try! NSRegularExpression(pattern: #"\btell me (what|how|why|who|which)\b"#, options: .caseInsensitive),
-        try! NSRegularExpression(pattern: #"\bsomebody (tell|explain|give) (me|us)\b"#, options: .caseInsensitive),
-        try! NSRegularExpression(pattern: #"\bwho (here|in this class|in this room|among you)\b"#, options: .caseInsensitive),
+        try! NSRegularExpression(pattern: #"\banyone (know|want to|care to)\b"#, options: .caseInsensitive),
+        try! NSRegularExpression(pattern: #"\blet's hear from\b"#, options: .caseInsensitive),
+        try! NSRegularExpression(pattern: #"\bwhat do you think\b"#, options: .caseInsensitive),
     ]
     private func detectCC(_ t: String) {
         let ns = t as NSString; let r = NSRange(location: 0, length: ns.length)
@@ -220,12 +277,127 @@ import Foundation; import SwiftUI
         }
     }
 
+    private func runNoteRequest(_ request: PendingNoteRequest) {
+        noteAgentBusy = true
+        let capturedLid = request.lectureId
+        let capturedBlockIndex = request.blockIndex
+        let capturedText = request.text
+        // Snapshot state at the moment the request actually starts (not when it was queued)
+        // so a merged follow-up request sees the freshest notes/context.
+        let capturedSubject = activeLectureSubject
+        let capturedSlides = slideStructure
+        let capturedRecentNotes = Array(noteBlocks.suffix(20))
+        let capturedStyleGuide = notePromptStyleGuide
+        let capturedDetailLevel = aiNoteDetailLevel
+        let capturedRecentTranscript = liveBlocks
+            .filter { $0.isSealed && !$0.textEn.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .suffix(4)
+            .map {
+                Block(
+                    id: $0.id,
+                    lectureId: capturedLid,
+                    blockIndex: $0.blockIndex,
+                    textEn: $0.textEn,
+                    textZh: $0.textZh,
+                    isFinal: 1,
+                    startedAt: $0.createdAt ?? Int64(Date().timeIntervalSince1970 * 1000),
+                    createdAt: $0.createdAt
+                )
+            }
+        aiNotesStatus = "Writing..."
+        noteTask = Task { [weak self] in
+            let block = Block(
+                id: UUID().uuidString,
+                lectureId: capturedLid,
+                blockIndex: capturedBlockIndex,
+                textEn: capturedText,
+                textZh: nil,
+                isFinal: 1,
+                startedAt: Int64(Date().timeIntervalSince1970 * 1000),
+                createdAt: Int64(Date().timeIntervalSince1970 * 1000)
+            )
+            let noteContext = capturedRecentTranscript.isEmpty ? [block] : capturedRecentTranscript
+            guard let (slideIndex, content) = await DeepSeekService.shared.generateNoteEntry(
+                slides: capturedSlides,
+                recent: noteContext,
+                recentNotes: capturedRecentNotes,
+                subject: capturedSubject,
+                styleGuide: capturedStyleGuide,
+                detailLevel: capturedDetailLevel
+            ) else {
+                await MainActor.run {
+                    guard let self else { return }
+                    if self.activeLectureId == capturedLid { self.aiNotesStatus = "Listening" }
+                    self.finishNoteRequest()
+                }
+                return
+            }
+            await MainActor.run {
+                guard let self else { return }
+                defer { self.finishNoteRequest() }
+                guard self.isRecording, self.activeLectureId == capturedLid else { return }
+                guard !self.isDuplicateAINote(content) else {
+                    self.aiNotesStatus = "Duplicate skipped"
+                    return
+                }
+                let slideTitle = self.slideStructure.first(where: { $0.index == slideIndex })?.title
+                let numberedContent = Self.renumberAINote(content, startingAt: self.nextAINoteNumber())
+                let note = self.db.saveNoteBlock(
+                    lectureId: capturedLid,
+                    slideIndex: slideIndex,
+                    slideTitle: slideTitle,
+                    content: numberedContent,
+                    source: "ai",
+                    level: 0
+                )
+                self.noteBlocks.append(note)
+                self.aiNotesStatus = "Updated"
+            }
+        }
+    }
+
+    private func finishNoteRequest() {
+        noteAgentBusy = false
+        guard let next = pendingNoteRequest else { return }
+        pendingNoteRequest = nil
+        guard next.lectureId == activeLectureId else { return }
+        runNoteRequest(next)
+    }
+
+    private func appendLectureSummary(lectureId: String) async {
+        aiNotesStatus = "Summarizing..."
+        let blocks = db.getRecentBlocks(lectureId: lectureId, beforeIndex: 9999, limit: 60)
+        let notes = noteBlocks
+        guard let summary = await ds.generateLectureSummary(blocks: blocks, notes: notes, subject: activeLectureSubject, styleGuide: notePromptStyleGuide, detailLevel: aiNoteDetailLevel) else {
+            aiNotesStatus = "Ready"
+            return
+        }
+        guard activeLectureId == lectureId else { return }
+        let alreadyHasSummary = noteBlocks.contains { $0.displayText.localizedCaseInsensitiveContains("Summary") }
+        guard !alreadyHasSummary else {
+            aiNotesStatus = "Ready"
+            return
+        }
+        let note = db.saveNoteBlock(
+            lectureId: lectureId,
+            slideIndex: noteBlocks.last?.slideIndex ?? 0,
+            slideTitle: "Summary",
+            content: "\n\n" + summary,
+            source: "ai",
+            level: 0
+        )
+        noteBlocks.append(note)
+        aiNotesStatus = "Summary added"
+    }
+
     // MARK: - Auto Explain
     private func autoExplain(text: String, lectureId: String) async {
-        guard let detected = await ds.detectUnfamiliarTerm(text: text, subject: activeLectureSubject, knownTerms: recentlyExplained) else { return }
+        let customKnownTerms = Self.knowledgeTerms(from: autoExplainKnowledge)
+        guard let detected = await ds.detectUnfamiliarTerm(text: text, subject: activeLectureSubject, knownTerms: recentlyExplained.union(customKnownTerms), customKnowledge: autoExplainKnowledge) else { return }
         guard detected.confidence > 0.65 else { return }
         let key = detected.term.lowercased()
         guard !recentlyExplained.contains(key) else { return }
+        guard !customKnownTerms.contains(key) else { return }
 
         // Check Knowledge Profile before showing explanation
         let status = MemoryService.shared.checkConcept(detected.term)
@@ -234,6 +406,7 @@ import Foundation; import SwiftUI
             return  // skip entirely, student knows this
         case .lookedUp:
             // Show a brief reminder — "You've seen this before" card
+            guard activeLectureId == lectureId else { return }
             let rid = UUID().uuidString
             let r = SearchResultState(id: rid, query: detected.term,
                                       professional: "You've seen this before: \(detected.term)",
@@ -249,13 +422,13 @@ import Foundation; import SwiftUI
         recentlyExplained.insert(key)
         if recentlyExplained.count > 60, let old = recentlyExplained.first { recentlyExplained.remove(old) }
 
+        guard activeLectureId == lectureId else { return }
         let rid = UUID().uuidString
         autoExplainStreaming = true; autoExplainTokens = ""
         let ctx = db.getRecentBlocks(lectureId: lectureId, beforeIndex: 9999, limit: 10)
         do {
-            let full = try await ds.streamSearch(query: detected.term, context: ctx, subject: activeLectureSubject) { [weak self] t in
-                self?.autoExplainTokens += t
-            }
+            let full = try await ds.streamSearch(query: detected.term, context: ctx, subject: activeLectureSubject, customKnowledge: autoExplainKnowledge) { _ in }
+            guard activeLectureId == lectureId else { return }
             let parts = full.components(separatedBy: " | ")
             let pro = parts.first?.trimmingCharacters(in: .whitespaces) ?? full
             let intu = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
@@ -263,7 +436,9 @@ import Foundation; import SwiftUI
             autoExplainResult = r; autoExplainStreaming = false
             autoExplainNew = (bottomTab != "auto")
             MemoryService.shared.recordInteraction(concept: detected.term, action: .autoExplain)
-        } catch { autoExplainStreaming = false }
+        } catch {
+            if activeLectureId == lectureId { autoExplainStreaming = false }
+        }
     }
 
     func dismissAutoExplain() {
@@ -290,7 +465,6 @@ import Foundation; import SwiftUI
             MemoryService.shared.recordInteraction(concept: String(term).lowercased(), action: .autoExplain)
         }
     }
-
     // MARK: - Search (Spec 6.5)
     func triggerSearch(query: String, blockIndex: Int, lectureId: String? = nil) {
         let lid = lectureId ?? activeLectureId; guard let lid else { return }
@@ -307,7 +481,7 @@ import Foundation; import SwiftUI
             for attempt in 1...2 {
                 do {
                     if attempt == 2 { streamingTokens = "" }
-                    let full = try await ds.streamSearch(query: query, context: ctx, subject: subj) { [weak self] t in self?.streamingTokens += t }
+                    let full = try await ds.streamSearch(query: query, context: ctx, subject: subj) { _ in }
                     let parts = full.components(separatedBy: " | ")
                     let pro = parts.first?.trimmingCharacters(in: .whitespaces) ?? full
                     let intu = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
@@ -355,12 +529,12 @@ import Foundation; import SwiftUI
 
     // MARK: - Notes (Spec 10.3: handleCopyToNotes)
     func saveNoteBlockToDb(lectureId: String, slideIndex: Int, slideTitle: String?, content: String, source: String) -> NoteBlock {
-        return db.saveNoteBlock(lectureId: lectureId, slideIndex: slideIndex, slideTitle: slideTitle, content: content, source: source, level: 1)
+        return db.saveNoteBlock(lectureId: lectureId, slideIndex: slideIndex, slideTitle: slideTitle, content: content, source: source, level: 0)
     }
     func handleCopyToNotes(text: String) {
         guard let lid = activeLectureId else { return }
         let last = noteBlocks.last
-        let n = db.saveNoteBlock(lectureId: lid, slideIndex: last?.slideIndex ?? 0, slideTitle: last?.slideTitle, content: text, source: "user", level: 1)
+        let n = db.saveNoteBlock(lectureId: lid, slideIndex: last?.slideIndex ?? 0, slideTitle: last?.slideTitle, content: text, source: "user", level: 0)
         noteBlocks.append(n)
     }
     func updateNote(id: String, content: String, level: Int?) {
@@ -368,6 +542,184 @@ import Foundation; import SwiftUI
         else { db.updateNoteBlock(id: id, content: content, level: nil) }
     }
     func deleteNote(id: String) { db.deleteNoteBlock(id: id); noteBlocks.removeAll { $0.id == id } }
+
+    func learnNoteStyle(from plainText: String) {
+        let learned = Self.inferNoteStyleGuide(from: plainText)
+        guard learned != noteStyleGuide else { return }
+        noteStyleGuide = learned
+        db.setSetting(key: "noteStyleGuide", value: learned)
+        aiNotesStatus = "Style learned"
+    }
+
+    func setAINoteDetailLevel(_ level: String) {
+        guard ["concise", "balanced", "detailed"].contains(level) else { return }
+        aiNoteDetailLevel = level
+        db.setSetting(key: "aiNoteDetailLevel", value: level)
+        aiNotesStatus = detailLabel(for: level)
+    }
+
+    func setAINoteFramework(_ framework: String) {
+        aiNoteFramework = framework
+        db.setSetting(key: "aiNoteFramework", value: framework)
+        aiNotesStatus = framework.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Ready" : "Framework saved"
+    }
+
+    func setAutoExplainKnowledge(_ knowledge: String) {
+        autoExplainKnowledge = knowledge
+        db.setSetting(key: "autoExplainKnowledge", value: knowledge)
+    }
+
+    func setDisplayFontSize(_ size: String) {
+        guard ["small", "medium", "large"].contains(size) else { return }
+        displayFontSize = size
+        db.setSetting(key: "displayFontSize", value: size)
+    }
+
+    func setShowTranslation(_ enabled: Bool) {
+        showTranslation = enabled
+        db.setSetting(key: "showTranslation", value: enabled ? "true" : "false")
+    }
+
+    func setHoverFreezeEnabled(_ enabled: Bool) {
+        hoverFreezeEnabled = enabled
+        if !enabled { isScrollFrozen = false }
+        db.setSetting(key: "hoverFreezeEnabled", value: enabled ? "true" : "false")
+    }
+
+    var transcriptEnglishFontSize: CGFloat {
+        switch displayFontSize {
+        case "small": return 12
+        case "large": return 15
+        default: return 13
+        }
+    }
+
+    var transcriptTranslationFontSize: CGFloat {
+        max(11, transcriptEnglishFontSize - 1)
+    }
+
+    var shouldShowTranslation: Bool {
+        showTranslation && !showFullTranscript
+    }
+
+    func detailLabel(for level: String? = nil) -> String {
+        switch level ?? aiNoteDetailLevel {
+        case "concise": return "Concise"
+        case "detailed": return "Detailed"
+        default: return "Balanced"
+        }
+    }
+
+    private func loadNotePreferences() {
+        noteStyleGuide = db.getSetting(key: "noteStyleGuide") ?? Self.defaultNoteStyleGuide
+        let detail = db.getSetting(key: "aiNoteDetailLevel") ?? "balanced"
+        aiNoteDetailLevel = ["concise", "balanced", "detailed"].contains(detail) ? detail : "balanced"
+        aiNoteFramework = db.getSetting(key: "aiNoteFramework") ?? ""
+        autoExplainKnowledge = db.getSetting(key: "autoExplainKnowledge") ?? ""
+        let fontSize = db.getSetting(key: "displayFontSize") ?? "medium"
+        displayFontSize = ["small", "medium", "large"].contains(fontSize) ? fontSize : "medium"
+        showTranslation = db.getSetting(key: "showTranslation") != "false"
+        hoverFreezeEnabled = db.getSetting(key: "hoverFreezeEnabled") != "false"
+    }
+
+    private var notePromptStyleGuide: String {
+        let trimmed = aiNoteFramework.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return noteStyleGuide }
+        return noteStyleGuide + "\nUser's preferred note framework:\n" + trimmed
+    }
+
+    private func nextAINoteNumber() -> Int {
+        let pattern = #"^\s*(\d+)\.\s"#
+        return noteBlocks
+            .flatMap { $0.displayText.components(separatedBy: .newlines) }
+            .compactMap { line -> Int? in
+                guard let range = line.range(of: pattern, options: .regularExpression) else { return nil }
+                return Int(line[range].trimmingCharacters(in: CharacterSet(charactersIn: " .")))
+            }
+            .max()
+            .map { $0 + 1 } ?? 1
+    }
+
+    private static func renumberAINote(_ content: String, startingAt start: Int) -> String {
+        var current = max(1, start) - 1
+        return content.components(separatedBy: .newlines).map { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.range(of: #"^\d+\.\s"#, options: .regularExpression) != nil {
+                current += 1
+                return line.replacingOccurrences(of: #"^\s*\d+\.\s"#, with: "\(current). ", options: .regularExpression)
+            }
+            if trimmed.range(of: #"^\d+\.\d+\s"#, options: .regularExpression) != nil {
+                let parent = max(1, current)
+                return line.replacingOccurrences(of: #"^\s*\d+\."#, with: "\(parent).", options: .regularExpression)
+            }
+            return line
+        }.joined(separator: "\n")
+    }
+
+    private func isDuplicateAINote(_ content: String) -> Bool {
+        let candidate = Self.normalizedNoteText(content)
+        guard candidate.count > 24 else { return false }
+        let candidateTokens = Set(candidate.split(separator: " ").map(String.init).filter { $0.count > 3 })
+        for note in noteBlocks.suffix(12) {
+            let existing = Self.normalizedNoteText(note.displayText)
+            if existing.contains(candidate) || candidate.contains(existing), min(existing.count, candidate.count) > 24 {
+                return true
+            }
+            let existingTokens = Set(existing.split(separator: " ").map(String.init).filter { $0.count > 3 })
+            let union = candidateTokens.union(existingTokens)
+            guard !union.isEmpty else { continue }
+            let overlap = Double(candidateTokens.intersection(existingTokens).count) / Double(union.count)
+            if overlap >= 0.72 { return true }
+        }
+        return false
+    }
+
+    private static let defaultNoteStyleGuide = "Student note style: compact Apple Notes-style numbered notes. Prefer one to three useful lines, concrete terms, formulas, examples, and compact tables only when they help."
+
+    private static func inferNoteStyleGuide(from text: String) -> String {
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !lines.isEmpty else { return defaultNoteStyleGuide }
+
+        let wordCount = lines.reduce(0) { $0 + $1.split(separator: " ").count }
+        let averageWords = Double(wordCount) / Double(max(lines.count, 1))
+        let detail = averageWords <= 9 ? "very concise" : (averageWords <= 18 ? "balanced" : "detailed")
+        let usesThirdDepth = text.contains("1.1.1")
+        let usesTables = text.contains("| --- |") || text.contains("|---")
+        let numberedLines = lines.filter { $0.range(of: #"^\d+(\.\d+)*\s"#, options: .regularExpression) != nil }.count
+        let prefersNumbering = numberedLines >= max(2, lines.count / 4)
+
+        var parts = ["Student note style: \(detail), Apple Notes-style"]
+        parts.append(prefersNumbering ? "prefer numbered structure" : "use plain paragraphs unless structure clearly helps")
+        parts.append(usesThirdDepth ? "allow 1.1.1 depth for examples/formulas" : "prefer 1. and 1.1; avoid third depth unless necessary")
+        parts.append(usesTables ? "include compact tables for comparisons/data" : "avoid tables unless the transcript contains clear comparison/data")
+        parts.append("preserve concrete terms, formulas, examples, and exam cues; never add filler")
+        return parts.joined(separator: "; ") + "."
+    }
+
+    private static func normalizedNoteText(_ text: String) -> String {
+        text.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    private static func knowledgeTerms(from text: String) -> Set<String> {
+        Set(text
+            .lowercased()
+            .components(separatedBy: CharacterSet(charactersIn: ",;，；\n"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 2 })
+    }
+    func handleCommandN() {
+        if isRecording, activeTabId == "live", activeLectureId != nil {
+            newNoteRequest += 1
+        } else {
+            showNewLectureModal = true
+        }
+    }
 
     // MARK: - Tabs (Spec 7.2: appStore)
     func openPastLecture(id: String, name: String?) {
@@ -386,7 +738,10 @@ import Foundation; import SwiftUI
     // MARK: - Reset
     private func resetLive() { liveBlocks = []; activeBlockId = nil; interimText = ""; interimBuf = ""
         noteBlocks = []; slideStructure = []; activeCard = nil; bottomTab = "current"
-        sessionSaves = []; sessionSearches = []; coldCallPhase = nil; lastCC = nil; searchCache.removeAll() }
+        sessionSaves = []; sessionSearches = []; coldCallPhase = nil; lastCC = nil; searchCache.removeAll()
+        pendingNoteRequest = nil; noteAgentBusy = false
+        autoExplainResult = nil; autoExplainStreaming = false; autoExplainTokens = ""
+        autoExplainNew = false; recentlyExplained.removeAll(); autoExplainBusy = false }
 
     /// Holds the most recent text selection from the transcript, for keyboard shortcuts.
     static var lastSelectedText: String = ""
