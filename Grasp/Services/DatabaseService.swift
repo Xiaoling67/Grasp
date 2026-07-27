@@ -45,6 +45,7 @@ final class DatabaseService {
                 let n = String(cString: sqlite3_column_name(s, i))
                 switch sqlite3_column_type(s, i) {
                 case SQLITE_INTEGER: row[n] = sqlite3_column_int64(s, i)
+                case SQLITE_FLOAT:   row[n] = sqlite3_column_double(s, i)
                 case SQLITE_TEXT:    row[n] = String(cString: sqlite3_column_text(s, i))
                 default: break
                 }
@@ -63,6 +64,7 @@ final class DatabaseService {
             case nil: sqlite3_bind_null(s, idx)
             case let x as Int:    sqlite3_bind_int64(s, idx, Int64(x))
             case let x as Int64:  sqlite3_bind_int64(s, idx, x)
+            case let x as Double: sqlite3_bind_double(s, idx, x)
             case let x as String: sqlite3_bind_text(s, idx, x, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             default: break
             }
@@ -176,8 +178,9 @@ final class DatabaseService {
         let id = uid()
         let maxO = (row("SELECT MAX(sort_order) as m FROM note_blocks WHERE lecture_id=?", [lectureId])?["m"] as? Double) ?? 0
         let so = maxO + 1
-        run("INSERT INTO note_blocks(id,lecture_id,slide_index,slide_title,content,source,level,sort_order) VALUES(?,?,?,?,?,?,?,?)", [id, lectureId, slideIndex, slideTitle, content, source, level, so])
-        return NoteBlock(id: id, lectureId: lectureId, slideIndex: slideIndex, slideTitle: slideTitle, content: content, source: source, level: level, sortOrder: Int(so))
+        let ts = now()
+        run("INSERT INTO note_blocks(id,lecture_id,slide_index,slide_title,content,source,level,sort_order,created_at) VALUES(?,?,?,?,?,?,?,?,?)", [id, lectureId, slideIndex, slideTitle, content, source, level, so, ts])
+        return NoteBlock(id: id, lectureId: lectureId, slideIndex: slideIndex, slideTitle: slideTitle, content: content, source: source, level: level, sortOrder: Int(so), createdAt: ts)
     }
     func updateNoteBlock(id: String, content: String, level: Int?) {
         if let lvl = level { run("UPDATE note_blocks SET content=?,level=?,source='user' WHERE id=?", [content, lvl, id]) }

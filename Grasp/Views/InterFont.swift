@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import CoreText
 
 enum Inter {
@@ -10,7 +11,7 @@ enum Inter {
 
 extension Font {
     static func inter(size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .custom(name(weight), size: size)
+        .system(size: size, weight: weight, design: .rounded)
     }
 
     private static func name(_ w: Font.Weight) -> String {
@@ -22,5 +23,16 @@ extension Font {
         case .bold:     return "Inter-Bold"
         default:        return "Inter-Regular"
         }
+    }
+}
+
+extension NSFont {
+    static func graspRounded(size: CGFloat, weight: NSFont.Weight = .regular) -> NSFont {
+        let base = NSFont.systemFont(ofSize: size, weight: weight)
+        guard let descriptor = base.fontDescriptor.withDesign(.rounded),
+              let rounded = NSFont(descriptor: descriptor, size: size) else {
+            return base
+        }
+        return rounded
     }
 }

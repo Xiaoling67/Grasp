@@ -7,18 +7,20 @@ final class DeepSeekService {
 
     // MARK: - AI Search (streaming, max_tokens=200)
 
-    func streamSearch(query: String, context: [Block], subject: String, onToken: @escaping (String) -> Void) async throws -> String {
+    func streamSearch(query: String, context: [Block], subject: String, customKnowledge: String = "", onToken: @escaping (String) -> Void) async throws -> String {
         let ctx = context.map { $0.textEn }.joined(separator: "\n\n")
         let subjectLabel = subject.isEmpty ? "this subject" : subject
         let system = "You generate instant study cards for students in live university lectures. Be precise, grounded in the lecture, and speak directly to a confused student who just heard this term for the first time."
         let knownTermsList = MemoryService.shared.getKnownTerms()
         let knownTermsBlock = knownTermsList.isEmpty ? "" : "\nKnown terms (the student already understands these — don't waste time explaining them from scratch):\n\(knownTermsList.sorted().joined(separator: ", "))\n"
+        let customKnowledgeBlock = customKnowledge.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\nStudent-provided existing knowledge:\n\(customKnowledge)\n"
         let prompt = """
         Course: \(subject.isEmpty ? "Unknown" : subject)
 
         What the professor has been explaining:
         \(ctx.isEmpty ? "(lecture just started, no transcript yet)" : ctx)
         \(knownTermsBlock)
+        \(customKnowledgeBlock)
         The student just highlighted: "\(query)"
 
         Write exactly 2 sentences separated by " | ". No markdown, no labels, no headers.
@@ -31,16 +33,18 @@ final class DeepSeekService {
         return try await stream(system: system, prompt: prompt, maxTokens: 200, onToken: onToken)
     }
 
-    // MARK: - AI Notes (max_tokens=120)
+    // MARK: - AI Notes
 
-    func generateNoteEntry(slides: [SlideItem], recent: [Block], recentNotes: [NoteBlock], subject: String) async -> (Int, String, Int)? {
+    func generateNoteEntry(slides: [SlideItem], recent: [Block], recentNotes: [NoteBlock], subject: String, styleGuide: String, detailLevel: String) async -> (Int, String)? {
         guard !recent.isEmpty else { return nil }
-        let tx = recent.map { $0.textEn }.joined(separator: "\n\n")
+        let currentBlock = recent.last?.textEn ?? ""
+        let priorContext = recent.dropLast().map { $0.textEn }.joined(separator: "\n\n")
         let sc = subject.isEmpty ? "" : "on \"\(subject)\""
-        let system = "You are a silent, attentive note-taker at a live university lecture. You capture one key insight at a time in 25 words or fewer. You skip filler, transitions, and anything already noted."
+        let detailPolicy = noteDetailPolicy(detailLevel)
+        let system = "You are a senior AI lecture note-taker inside a polished Mac notes app. Your job is to create notes that a top student would actually keep: accurate, compact, structured, and easy to review. You skip filler, transitions, vague restatements, and anything already noted."
 
         let recentNotesText = recentNotes.isEmpty ? "(none yet)" :
-            recentNotes.map { "- " + $0.content }.joined(separator: "\n")
+            recentNotes.map { "- " + $0.displayText }.joined(separator: "\n")
 
         let prompt: String
         if !slides.isEmpty {
@@ -52,45 +56,81 @@ final class DeepSeekService {
             Slide structure:
             \(st)
 
-            What the professor just said:
-            \(tx)
+            Recent transcript context (use only to resolve pronouns, continuity, and topic):
+            \(priorContext.isEmpty ? "(none)" : priorContext)
+
+            Current sealed block to mine for NEW notes:
+            \(currentBlock)
 
             Notes already taken (do NOT duplicate these):
             \(recentNotesText)
 
-            Extract the ONE most important new fact, definition, or concept from what the professor just said.
+            Student's learned note style:
+            \(styleGuide)
+
+            User-selected detail level:
+            \(detailPolicy)
+
+            Extract the most important new fact, definition, framework, formula, causal mechanism, comparison, professor-emphasized point, or exam-worthy distinction from the CURRENT sealed block.
 
             If the content is transitional ("moving on", "as I mentioned", "okay so", "next slide"), filler, or already covered in the notes above, output: {"skip": true}
 
             Otherwise output a JSON object (no markdown):
-            { "slideIndex": <one of: \(vi)>, "content": "<direct statement, ≤ 25 words>", "level": <0, 1, or 2> }
+            { "slideIndex": <one of: \(vi)>, "content": "<Apple Notes-style outline>", "confidence": <0.0-1.0> }
 
-            level 0 = the single central thesis of this slide — use at most once per slide, only for the defining idea
-            level 1 = a key supporting fact, definition, or explanation (default)
-            level 2 = a specific example, number, formula, or sub-detail
+            Use at most three outline depths:
+            1. Main idea, definition, or claim
+            1.1 Short explanation or mechanism
+            • Concrete example, formula, number, or exception only if present
+
+            Follow the user-selected detail level exactly. No markdown headings. Do not use `1.1.1` or hollow bullets.
+            If the content is a comparison, classification, variables, or data, include a compact markdown-style table after the numbered line.
+            If the professor signals importance ("remember", "key", "exam", "important", "the point is", "notice"), include an "Exam cue:" or "Key point:" phrase in the note.
+            Use precise nouns and numbers from the professor. Do not write generic lines like "This is important" or "The professor explains".
+            Use recent transcript context only to understand the current block; do not create a note solely from older context.
             slideIndex = which slide the professor is currently discussing
+            confidence = how likely this note is useful and non-duplicative; use <0.55 for weak/filler content.
             """
         } else {
             prompt = """
             Lecture \(sc).
 
-            What the professor just said:
-            \(tx)
+            Recent transcript context (use only to resolve pronouns, continuity, and topic):
+            \(priorContext.isEmpty ? "(none)" : priorContext)
+
+            Current sealed block to mine for NEW notes:
+            \(currentBlock)
 
             Notes already taken (do NOT duplicate these):
             \(recentNotesText)
 
-            Extract the ONE most important new fact, definition, or concept from what the professor just said.
+            Student's learned note style:
+            \(styleGuide)
+
+            User-selected detail level:
+            \(detailPolicy)
+
+            Extract the most important new fact, definition, framework, formula, causal mechanism, comparison, professor-emphasized point, or exam-worthy distinction from the CURRENT sealed block.
 
             If the content is transitional, filler, or already covered in the notes above, output: {"skip": true}
 
             Otherwise output a JSON object (no markdown):
-            { "slideIndex": 0, "content": "<direct statement, ≤ 25 words>", "level": <0, 1, or 2> }
+            { "slideIndex": 0, "content": "<Apple Notes-style outline>", "confidence": <0.0-1.0> }
 
-            level 0 = central thesis (use sparingly), level 1 = key point (default), level 2 = specific detail
+            Use at most three outline depths:
+            1. Main idea, definition, or claim
+            1.1 Short explanation or mechanism
+            • Concrete example, formula, number, or exception only if present
+
+            Follow the user-selected detail level exactly. No markdown headings. Do not use `1.1.1` or hollow bullets.
+            If the content is a comparison, classification, variables, or data, include a compact markdown-style table after the numbered line.
+            If the professor signals importance ("remember", "key", "exam", "important", "the point is", "notice"), include an "Exam cue:" or "Key point:" phrase in the note.
+            Use precise nouns and numbers from the professor. Do not write generic lines like "This is important" or "The professor explains".
+            Use recent transcript context only to understand the current block; do not create a note solely from older context.
+            confidence = how likely this note is useful and non-duplicative; use <0.55 for weak/filler content.
             """
         }
-        guard let raw = try? await call(system: system, prompt: prompt, maxTokens: 120) else { return nil }
+        guard let raw = try? await call(system: system, prompt: prompt, maxTokens: detailLevel == "detailed" ? 360 : 240) else { return nil }
         // Handle skip signal — proper JSON parse to avoid false positives from content text
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
         if let s = trimmed.firstIndex(of: "{"), let e = trimmed.lastIndex(of: "}"),
@@ -98,20 +138,96 @@ final class DeepSeekService {
            let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
            let skip = j["skip"] as? Bool, skip { return nil }
         guard let p = parseJSON(raw), let c = p["content"] as? String, !c.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+        if let confidence = p["confidence"] as? Double, confidence < 0.55 { return nil }
         var si = p["slideIndex"] as? Int ?? 0
         if !slides.isEmpty { let v = slides.map(\.index); if !v.contains(si) { si = v.last ?? 0 } }
-        let lv = [0,1,2].contains(p["level"] as? Int ?? -1) ? p["level"] as! Int : 1
-        return (si, c.trimmingCharacters(in: .whitespaces), lv)
+        let content = c
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (si, content)
+    }
+
+    func generateLectureSummary(blocks: [Block], notes: [NoteBlock], subject: String, styleGuide: String, detailLevel: String) async -> String? {
+        guard !blocks.isEmpty || !notes.isEmpty else { return nil }
+        let transcript = blocks.suffix(18).map { $0.textEn }.joined(separator: "\n\n")
+        let noteText = notes.map(\.displayText).joined(separator: "\n\n")
+        let detailPolicy = summaryDetailPolicy(detailLevel)
+        let system = "You are a world-class study-note editor. You turn live rough notes into a concise Apple Notes-style closing summary without losing exam-worthy details."
+        let prompt = """
+        Course: \(subject.isEmpty ? "Unknown" : subject)
+
+        Existing notes:
+        \(noteText.isEmpty ? "(none)" : noteText)
+
+        Student's learned note style:
+        \(styleGuide)
+
+        User-selected summary detail:
+        \(detailPolicy)
+
+        Recent transcript:
+        \(transcript.isEmpty ? "(none)" : transcript)
+
+        Write a final section to append at the end of the student's note document.
+        Output plain text only. No JSON. No markdown fences.
+
+        Format exactly:
+        Summary
+        1. <core idea or takeaway>
+        1.1 <mechanism / why it matters>
+        • <example, number, formula, or exam cue if present>
+
+        Key Terms
+        | Term | Meaning | Why it matters |
+        | --- | --- | --- |
+        | ... | ... | ... |
+
+        Rules:
+        - Follow the user-selected summary detail exactly.
+        - Include the table only if at least two real terms are present.
+        - Do not duplicate notes verbatim.
+        - Prefer concrete details from the lecture over generic study advice.
+        """
+        guard let raw = try? await call(system: system, prompt: prompt, maxTokens: detailLevel == "detailed" ? 760 : 520) else { return nil }
+        let cleaned = raw
+            .replacingOccurrences(of: "```markdown", with: "")
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? nil : cleaned
+    }
+
+    private func noteDetailPolicy(_ level: String) -> String {
+        switch level {
+        case "concise":
+            return "Concise: output 1 line only, about 12-20 words. Use only `1.`. No table unless the professor gives explicit numbers or a direct comparison."
+        case "detailed":
+            return "Detailed: output 3-6 lines when useful, about 45-90 words total. Use `1.` for level 1, `1.1` for level 2, and `•` for level 3 examples, formulas, exceptions, and exam cues. Include compact tables for comparisons/data."
+        default:
+            return "Balanced: output 1-3 lines, about 22-45 words total. Use `1.` for level 1 and `1.1` for level 2; use `•` only for a concrete example, number, formula, or exam cue. Use tables only for clear comparisons/data."
+        }
+    }
+
+    private func summaryDetailPolicy(_ level: String) -> String {
+        switch level {
+        case "concise":
+            return "Concise: 2-3 numbered takeaways total, no table unless essential."
+        case "detailed":
+            return "Detailed: 5-7 numbered takeaways total, include mechanisms/examples when available, and include a Key Terms table when real terms are present."
+        default:
+            return "Balanced: 3-5 numbered takeaways total, include a compact Key Terms table when at least two real terms are present."
+        }
     }
 
     // MARK: - Auto Explain: detect one unfamiliar term (max_tokens=60)
 
-    func detectUnfamiliarTerm(text: String, subject: String, knownTerms: Set<String>) async -> (term: String, confidence: Double)? {
+    func detectUnfamiliarTerm(text: String, subject: String, knownTerms: Set<String>, customKnowledge: String = "") async -> (term: String, confidence: Double)? {
         let system = "You identify the single most unfamiliar technical term in a university lecture transcript for a student new to the subject."
         let knownList = knownTerms.isEmpty ? "" : "\nAlready explained — skip these: \(knownTerms.prefix(20).joined(separator: ", "))"
+        let customKnowledgeBlock = customKnowledge.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : "\nStudent-provided existing knowledge — skip terms the student says they already know:\n\(customKnowledge)"
         let prompt = """
         Lecture subject: \(subject.isEmpty ? "unknown" : subject)
         What the professor just said: "\(text)"\(knownList)
+        \(customKnowledgeBlock)
 
         Find the ONE term a new student is most likely confused by — technical jargon, abbreviations, formulas, or domain-specific concepts only. Ignore everyday words.
         Output ONLY JSON: {"term": "WACC", "confidence": 0.82}
@@ -179,7 +295,7 @@ final class DeepSeekService {
     func generateColdCallAnswer(question: String, context: [Block], slides: [SlideItem], recentNotes: [NoteBlock], subject: String) async -> ColdCallAnswer? {
         let tx = context.map { $0.textEn }.joined(separator: "\n\n")
         let st = slides.map { "- \($0.title)\($0.concepts.isEmpty ? "" : ": " + $0.concepts.joined(separator: ", "))" }.joined(separator: "\n")
-        let notesText = recentNotes.isEmpty ? "(none)" : recentNotes.map { "- " + $0.content }.joined(separator: "\n")
+        let notesText = recentNotes.isEmpty ? "(none)" : recentNotes.map { "- " + $0.displayText }.joined(separator: "\n")
         let subjectLabel = subject.isEmpty ? "this subject" : subject
         let system = "You help a student prepare a spoken answer to their professor's cold-call question. Your answer must be concise enough to say aloud in 30 seconds and grounded in what was taught today."
         let knownTermsList = MemoryService.shared.getKnownTerms()

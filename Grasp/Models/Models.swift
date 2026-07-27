@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 // Spec 7.1-7.2: Data structures matching DB tables + state stores
@@ -17,6 +18,43 @@ struct Block: Identifiable {
 struct NoteBlock: Identifiable {
     var id: String; var lectureId: String; var slideIndex: Int; var slideTitle: String?
     var content: String; var source: String; var level: Int; var sortOrder: Int; var createdAt: Int64?
+
+    var displayText: String {
+        if content.hasPrefix(String.richTextRTFPrefix),
+           let data = Data(base64Encoded: String(content.dropFirst(String.richTextRTFPrefix.count))),
+           let attributed = try? NSAttributedString(
+            data: data,
+            options: [.documentType: NSAttributedString.DocumentType.rtf],
+            documentAttributes: nil
+           ) {
+            return attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard content.looksLikeRichTextHTML else {
+            return content
+        }
+        guard let data = content.data(using: .utf8),
+              let attributed = try? NSAttributedString(
+                data: data,
+                options: [.documentType: NSAttributedString.DocumentType.html],
+                documentAttributes: nil
+              ) else {
+            return content
+        }
+        return attributed.string.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+extension String {
+    static let richTextRTFPrefix = "grasp-rtf-base64:"
+
+    var looksLikeRichTextHTML: Bool {
+        localizedCaseInsensitiveContains("<html")
+            || localizedCaseInsensitiveContains("<body")
+            || localizedCaseInsensitiveContains("<p")
+            || localizedCaseInsensitiveContains("<span")
+            || localizedCaseInsensitiveContains("<br")
+            || localizedCaseInsensitiveContains("<div")
+    }
 }
 
 struct SavedCard: Identifiable {
@@ -39,6 +77,6 @@ struct TabItem: Identifiable { var id: String; var type: TabType; var lectureId:
 enum AppPage { case home, settings, saved, searched }
 struct SaveDraft { var type: String; var original: String; var translation: String?; var lectureId: String? }
 struct SearchResultState: Identifiable { var id: String; var query: String; var professional: String = ""; var intuition: String = ""; var error: String? = nil }
-enum ActiveCardState { case search(SearchResultState); case save(SaveDraft) }
 struct ColdCallAnswer { var questionType: String; var shortAnswer: String; var supportingPoints: [String] }
 enum ColdCallPhase { case detected(String); case generating; case answered(ColdCallAnswer) }
+enum ActiveCardState { case search(SearchResultState); case save(SaveDraft) }

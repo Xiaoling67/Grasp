@@ -14,7 +14,10 @@ import SwiftUI
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandMenu("Lecture") {
-                Button("New Lecture") { vm.showNewLectureModal = true }.keyboardShortcut("n", modifiers: [.command])
+                Button(vm.isRecording && vm.activeTabId == "live" ? "New Note" : "New Lecture") {
+                    vm.handleCommandN()
+                }
+                .keyboardShortcut("n", modifiers: [.command])
             }
             CommandMenu("Edit") {
                 Button("Pause/Resume Recording") { vm.togglePause() }

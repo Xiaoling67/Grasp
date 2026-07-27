@@ -31,7 +31,7 @@ struct PastLectureView: View {
 
     @ViewBuilder var notesBody: some View {
         if notes.isEmpty { Text("No notes from this lecture.").font(.inter(size: 13)).foregroundColor(Color.textTertiary).padding(.top, 40).frame(maxWidth: .infinity) }
-        else { VStack(alignment: .leading, spacing: 8) { ForEach(Array(notesSorted.enumerated()), id: \.offset) { _, n in let pre = n.level == 0 ? "1." : n.level == 1 ? "·" : "○"; HStack(alignment: .top, spacing: 6) { Text(pre).font(.inter(size: 12)).foregroundColor(Color.notesDividerGray).frame(width: 16); Text(n.content).font(.inter(size: 13)).foregroundColor(n.source == "user" ? Color.deepBlue : Color.nearBlack).padding(.leading, CGFloat(n.level * 16)) }.fixedSize(horizontal: false, vertical: true) } } }
+        else { VStack(alignment: .leading, spacing: 10) { ForEach(notesSorted) { n in Text(n.displayText).font(.inter(size: 13)).foregroundColor(n.source == "user" ? Color.deepBlue : Color.nearBlack).fixedSize(horizontal: false, vertical: true).padding(.vertical, 2) } } }
     }
 
     @ViewBuilder var savedBody: some View {

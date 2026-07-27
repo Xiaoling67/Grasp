@@ -120,8 +120,7 @@ struct ExportModalView: View {
                         }
                         lastSlide = n.slideIndex
                     }
-                    let indent = String(repeating: "    ", count: n.level)
-                    body(indent + (n.level == 0 ? "▸ " : "• ") + n.content)
+                    body(n.displayText)
                 }
                 divider()
             }
