@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0692007930C43A8522271B4E /* SearchCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C410AB07F2D52E455333A8 /* SearchCardView.swift */; };
 		08023323270DA002AE73D0EF /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 1B484BCA40ED47A28CA84C8D /* libsqlite3.tbd */; };
+		92D22A2ED1E241C48424EE04 /* ColdCallCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2E73417689C405B85B76EE9 /* ColdCallCardView.swift */; };
 		082714160E6902E4E7E70DE7 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5EC98F5FB5E5932CCDD1B61 /* HomeView.swift */; };
 		35681C9D9B91B3DDB0073D0B /* OnboardingModalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FE60FDDAA5C43556F1960D /* OnboardingModalView.swift */; };
 		44E1EF416235F972B142D2D6 /* SaveCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBF04FE70C69BB819F716A6F /* SaveCardView.swift */; };
@@ -50,6 +51,7 @@
 		0ADC10A105A0270D8A27A358 /* DeepgramService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepgramService.swift; sourceTree = "<group>"; };
 		0ED1CAD13FCFBF86CEE416B8 /* DatabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseService.swift; sourceTree = "<group>"; };
 		1B484BCA40ED47A28CA84C8D /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = usr/lib/libsqlite3.tbd; sourceTree = SDKROOT; };
+		C2E73417689C405B85B76EE9 /* ColdCallCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColdCallCardView.swift; sourceTree = "<group>"; };
 		1C23E2649D6DA06744EEF78F /* SlideParserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideParserService.swift; sourceTree = "<group>"; };
 		21FE60FDDAA5C43556F1960D /* OnboardingModalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingModalView.swift; sourceTree = "<group>"; };
 		2814E5CAA92DA330A56E631B /* SearchHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchHistoryView.swift; sourceTree = "<group>"; };
@@ -164,6 +166,7 @@
 				EA2717BF631ABA7130EE4897 /* InterFont.swift */,
 				46D20ABD3D4689B24D036B8B /* ToastView.swift */,
 				B251E095E71BB36F77F8D6B7 /* Bottom */,
+				A232051E78914DB9A7F44389 /* ColdCall */,
 				05698EFB41CF13D50E9C209D /* Layout */,
 				9A81225A6CB96E9CB48978F2 /* Modals */,
 				25D69FFF643C7C93EAD7AF28 /* Notes */,
@@ -189,6 +192,14 @@
 				21FE60FDDAA5C43556F1960D /* OnboardingModalView.swift */,
 			);
 			path = Modals;
+			sourceTree = "<group>";
+		};
+		A232051E78914DB9A7F44389 /* ColdCall */ = {
+			isa = PBXGroup;
+			children = (
+				C2E73417689C405B85B76EE9 /* ColdCallCardView.swift */,
+			);
+			path = ColdCall;
 			sourceTree = "<group>";
 		};
 		B251E095E71BB36F77F8D6B7 /* Bottom */ = {
@@ -324,6 +335,7 @@
 				5845F04708DE1630244380D3 /* AudioService.swift in Sources */,
 				DAA59D28BD3F5D0949E86AD9 /* AutoExplainCardView.swift in Sources */,
 				D7343C150CF17087B964DE1D /* BottomPanelView.swift in Sources */,
+				92D22A2ED1E241C48424EE04 /* ColdCallCardView.swift in Sources */,
 				93BC6F1BA576EC5A55863AD1 /* Color+Hex.swift in Sources */,
 				7F2C46D97114FA80D9504CD4 /* DatabaseService.swift in Sources */,
 				AE0788C206050AF0AF64B21E /* DeepSeekService.swift in Sources */,
