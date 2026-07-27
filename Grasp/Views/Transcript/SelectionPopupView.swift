@@ -4,7 +4,25 @@ import AppKit
 // v1.1-r2: Instant pill-shaped popup with NSVisualEffectView material
 // 4 consistent buttons: K (bookmark.fill), L (character.bubble.fill), Search (magnifyingglass), Note (square.and.pencil)
 struct SelectionPopupView: View {
-    @EnvironmentObject var vm: AppViewModel; let query: String; let blockIndex: Int; let x: CGFloat; let y: CGFloat; let onDismiss: () -> Void
+    @EnvironmentObject var vm: AppViewModel
+    let query: String
+    let blockIndex: Int
+    let x: CGFloat
+    let y: CGFloat
+    let panelSize: CGSize
+    let onDismiss: () -> Void
+
+    private var estimatedWidth: CGFloat {
+        vm.activeLectureMode == "international" ? 262 : 218
+    }
+
+    private var clampedX: CGFloat {
+        min(max(x, estimatedWidth / 2 + Spacing.xs), panelSize.width - estimatedWidth / 2 - Spacing.xs)
+    }
+
+    private var clampedY: CGFloat {
+        min(max(y, 18), panelSize.height - 18)
+    }
 
     var body: some View {
         HStack(spacing: 2) {
@@ -49,7 +67,7 @@ struct SelectionPopupView: View {
             RoundedRectangle(cornerRadius: CornerRadius.popup)
                 .stroke(Color.divider, lineWidth: 1)
         )
-        .position(x: min(max(x, 100), 750), y: max(y - 44, 8))
+        .position(x: clampedX, y: clampedY)
     }
 
     /// Consistent button style: icon + short label, plain appearance, same dimensions
