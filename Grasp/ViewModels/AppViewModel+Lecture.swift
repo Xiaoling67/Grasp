@@ -34,13 +34,12 @@ extension AppViewModel {
 
         let tab = TabItem(id: "live", type: .live, lectureId: lid, label: name ?? "Live Lecture")
         tabs = [tab] + tabs; activeTabId = "live"
-        if !(await AudioService.requestPermission()) {
-            showToast("Microphone access denied. Please allow it in System Settings → Privacy → Microphone.", type: "error")
+        do {
+            try await au.startCapture { [weak self] d, _ in self?.dg.sendAudio(d) }
+        } catch {
+            showToast("Audio capture failed. Please allow Screen Recording or Microphone access in System Settings → Privacy & Security.", type: "error")
             isRecording = false; endActivity(); return
         }
-        do {
-            try au.startCapture { [weak self] d, _ in self?.dg.sendAudio(d) }
-        } catch { showToast("Microphone failed to start.", type: "error"); isRecording = false; endActivity(); return }
         dg.onFinal = { [weak self] in self?.handleFinal($0) }
         dg.onInterim = { [weak self] in self?.handleInterim($0) }
         dg.onEnd = { [weak self] in self?.handleEnd() }
